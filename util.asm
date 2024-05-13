@@ -1,3 +1,9 @@
+.section zp
+
+rand16      .word ?
+
+.endsection
+
 util_init:
         lda #42
         sta rand16          ; seed random number generator with non-zero word
