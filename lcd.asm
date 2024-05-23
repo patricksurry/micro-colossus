@@ -3,8 +3,8 @@ Provides a simple interface to a small LCD controlled by a HD44780 or equivalent
 
     lcd_init    wake up the LCD and send sequence of initialization commands
     lcd_cls     clear screen (fill with space chr $20) and set xy to 0,0
-    lcd_setxy   set cursor position to LCDX = 0..LCD_WIDTH-1, LCDY = 0..LCD_HEIGHT-1
-    lcd_getxy   get current cursor position into LCDX, LCDY
+    lcd_setxy   set cursor position to lcd_x = 0..LCD_WIDTH-1, lcd_y = 0..LCD_HEIGHT-1
+    lcd_getxy   get current cursor position into lcd_x, lcd_y
     lcd_putc    put chr A at the current position and advance with appropriate wrapping
     lcd_puts    put zero-terminated string in STRP with wrapping
     lcd_blit    fill the screen from a buffer in STRP skipping A bytes of padding between rows
@@ -87,10 +87,11 @@ LCD_SET_CTRL .macro  v
 
 .section zp
 
-LCDX:       .byte ?
-LCDY:       .byte ?
-LCDPAD:     .byte ?         ; for lcd_blit
-LCDBUFP:    .word ?
+lcd_x:          .byte ?
+lcd_y:          .byte ?
+lcd_pad:        .byte ?         ; for lcd_blit
+lcd_tmp:        .byte ?
+lcd_bufp:       .word ?
 
 .endsection
 
@@ -123,8 +124,8 @@ _busy:  lda DVC_DATA
 _cont:  lda #DVC_SLCT_MASK  ; stop the status check
         trb DVC_CTRL
 
-        stx VIA_TMP         ; set up new action, leaving A=ctrl bits
-        .LCD_SET_CTRL VIA_TMP
+        stx via_tmp         ; set up new action, leaving A=ctrl bits
+        .LCD_SET_CTRL via_tmp
         ora #DVC_SLCT_LCD   ; prepare A to enable
 
         cpx #LCD_READ
@@ -192,8 +193,8 @@ lcd_cls:    ; () -> nil const X
     ; clear screen (fill with space chr $20) and set xy to 0,0
         ldy #%0000_0000     ; clear/home
         jsr lcd_cmd
-        stz LCDX
-        stz LCDY
+        stz lcd_x
+        stz lcd_y
         rts
 
 lcd_init_seq:
@@ -203,8 +204,8 @@ lcd_init_seq:
         .byte $ff
 
 lcd_getxy:  ; () -> nil const X
-    ; get the current physical screen position LCDX = 0..LCD_WIDTH-1(*), LCDY = 0..LCD_HEIGHT-1
-    ; (*) offscreen coords can have LCDX >= LCD_WIDTH
+    ; get the current physical screen position lcd_x = 0..LCD_WIDTH-1(*), lcd_y = 0..LCD_HEIGHT-1
+    ; (*) offscreen coords can have lcd_x >= LCD_WIDTH
         lda #LCD_STATUS
         jsr lcd_do          ; fetch A = DDRAM addr
         ldy #0
@@ -224,8 +225,8 @@ _top:
 _left:
 .endif
 .endif
-        sta LCDX
-        sty LCDY
+        sta lcd_x
+        sty lcd_y
         rts
 
 
@@ -243,14 +244,14 @@ lcd_putc:   ; (A) -> nil const X
 
         ; go back, write a space, go back again
 _bksp:  pha                 ; save nozero chr as flag
-_back:  dec LCDX
+_back:  dec lcd_x
         bpl _erase
         lda #LCD_WIDTH-1
-        sta LCDX
-        dec LCDY
+        sta lcd_x
+        dec lcd_y
         bpl _erase
         lda #LCD_HEIGHT-1
-        sta LCDY
+        sta lcd_y
 _erase: jsr lcd_setxy
         pla
         beq _done            ; first pass?
@@ -260,14 +261,15 @@ _erase: jsr lcd_setxy
         jsr lcd_putb
         bra _back
 
-_nl:    lda #$ff            ; advance until LCDX is zero (all bits clear to wrap)
-        bra _fill
-_tab:   lda #$03            ; advance until lower two bits in LCDX are clear
-_fill:  pha
-        lda #' '            ; fill until LCDX zeros all bits in Y
+_nl:    lda #$ff            ; advance until lcd_x is zero (all bits clear to wrap)
+        bra +
+_tab:   lda #$03            ; advance until lower two bits in lcd_x are clear
++
+        sta lcd_tmp
+_fill:  lda #' '            ; fill until lcd_x zeros all bits in mask
         jsr lcd_putb
-        pla
-        and LCDX
+        lda lcd_x
+        and lcd_tmp
         bne _fill            ; done fill?
 _done:  rts
 
@@ -277,25 +279,25 @@ lcd_putb:   ; (A) -> nil const X
         tay
         lda #LCD_WRITE      ; write character Y
         jsr lcd_do
-        inc LCDX            ; update position for next write
-        lda LCDX
+        inc lcd_x            ; update position for next write
+        lda lcd_x
         cmp #LCD_WIDTH      ; end of line?
         bmi _done
-        stz LCDX            ; wrap to start of next line
-        inc LCDY
-        lda LCDY
+        stz lcd_x            ; wrap to start of next line
+        inc lcd_y
+        lda lcd_y
         cmp #LCD_HEIGHT     ; past last row?
         bmi _setxy
-        stz LCDY
+        stz lcd_y
 _setxy: bra lcd_setxy           ; continue and return from setxy
 
 _done:  rts
 
 
 lcd_setxy:  ; () -> nil const X
-    ; set cursor position to LCDX = 0..LCD_WIDTH-1, LCDY = 0..LCD_HEIGHT-1
-        lda LCDX
-        ldy LCDY
+    ; set cursor position to lcd_x = 0..LCD_WIDTH-1, lcd_y = 0..LCD_HEIGHT-1
+        lda lcd_x
+        ldy lcd_y
 .if LCD_HEIGHT = 4
         cpy #2
         bmi _left
@@ -317,46 +319,46 @@ _top:
 
 
 lcd_puts:   ; () -> nil
-    ; put zero-terminated string in LCDBUFP (preserved) at current position
+    ; put zero-terminated string in lcd_bufp (preserved) at current position
         ldy #0
-        ldx LCDBUFP+1
-_loop:  lda (LCDBUFP),y
+        ldx lcd_bufp+1
+_loop:  lda (lcd_bufp),y
         beq _end
         phy
         jsr lcd_putc
         ply
         iny
         bne _loop
-        inc LCDBUFP+1
+        inc lcd_bufp+1
         bne _loop
-_end:   stx LCDBUFP+1
+_end:   stx lcd_bufp+1
         rts
 
 
 lcd_blit:   ; () -> nil
-    ; fill the screen from a buffer in LCDBUFP (stomped) skipping LCDPAD bytes between rows
-        stz LCDX            ; go to start of screen
-        stz LCDY
+    ; fill the screen from a buffer in lcd_bufp (stomped) skipping lcd_pad bytes between rows
+        stz lcd_x            ; go to start of screen
+        stz lcd_y
         ldy #$80            ; bit 7 for "set DDRAM offset" command, 0 for address
         jsr lcd_cmd
 _loop:  ldy #0
-_line:  lda (LCDBUFP),y
+_line:  lda (lcd_bufp),y
         phy
         jsr lcd_putc
         ply
         cpy #LCD_WIDTH
         bne _line
-        lda LCDBUFP
+        lda lcd_bufp
         clc
         adc #LCD_WIDTH
         bcc _pad
-        inc LCDBUFP+1
+        inc lcd_bufp+1
         clc
-_pad:   adc LCDPAD
-        sta LCDBUFP
+_pad:   adc lcd_pad
+        sta lcd_bufp
         bcc _next
-        inc LCDBUFP+1
-_next:  lda LCDY            ; wrapped back to start?
+        inc lcd_bufp+1
+_next:  lda lcd_y            ; wrapped back to start?
         bne _loop
         rts
 

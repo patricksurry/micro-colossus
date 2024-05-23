@@ -107,7 +107,7 @@ DVC_SET_CTRL .macro val, mask
 
 .section zp
 
-VIA_TMP:    .byte ?
+via_tmp:    .byte ?
 
 .endsection
 

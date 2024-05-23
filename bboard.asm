@@ -132,40 +132,7 @@ TALI_OPTION_TERSE := 0
 
 .include "../tali/taliforth.asm" ; zero page variables, definitions
 
-.if 0
-
-TEST        = 0                 ; compile unit tests?
-
-SCR_WIDTH   = 72                ; sreen width, < 256
-SCR_HEIGHT  = 16
-
-
-.section zp
-
-txt_strz    .word ?     ; input zero-terminated string
-txt_outz    .word ?     ; output buffer for zero-terminated string
-txt_digrams .word ?     ; digram lookup table (128 2-byte pairs)
-
-; unwrap temps
-txt_col     .byte ?
-txt_row     .byte ?
-wrp_col     .byte ?
-wrp_flg     .byte ?
-
-; woozy temps
-txt_repeat  .byte ?
-txt_shift   .byte ?
-txt_chr     .byte ?
-
-; dizzy temp
-txt_stack   .byte ?
-
-cb_head     .word ?, ?
-cb_tail     .word ?, ?
-
-.endsection
-
-.endif
+AscTab      = $09               ; tab
 
     .include "via.asm"
     .include "morse.asm"

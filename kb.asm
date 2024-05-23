@@ -4,16 +4,16 @@
 
 .section zp
 
-KB_KEY7:    .byte ?          ; bit 7 indicates key ready, with low seven bits of last chr
-KB_KEY8:    .byte ?          ; last full 8-bit character received
+kb_key7:    .byte ?          ; bit 7 indicates key ready, with low seven bits of last chr
+kb_key8:    .byte ?          ; last full 8-bit character received
 
 .endsection
 
 
 kb_init:    ; () -> nil const X, Y
     ; no keys yet
-        stz KB_KEY7
-        stz KB_KEY8
+        stz kb_key7
+        stz kb_key8
     ; set up handshake mode and interrupt on data ready
         lda VIA_PCR
         and #(255-VIA_HS_CA1_MASK)
@@ -24,11 +24,11 @@ kb_init:    ; () -> nil const X, Y
         rts
 
 kb_getc:    ; () -> A const X, Y
-    ; wait for a keypress to appear in KB_KEY7 and return with bit 7 clear
-        lda KB_KEY7     ; has top-bit set on ready
+    ; wait for a keypress to appear in kb_key7 and return with bit 7 clear
+        lda kb_key7     ; has top-bit set on ready
         bpl kb_getc
         and #$7f        ; clear top bit
-        stz KB_KEY7     ; key taken
+        stz kb_key7     ; key taken
         rts
 
 kb_isr:     ; () -> nil const A, X, Y
@@ -46,9 +46,9 @@ kb_isr:     ; () -> nil const A, X, Y
         stz DVC_DDR      ; set data port for reading
         lda DVC_DATA     ; fetch the value
 
-        sta KB_KEY8     ; store original
+        sta kb_key8     ; store original
         ora #$80        ; flag key ready
-        sta KB_KEY7     ; store with top bit set for getc
+        sta kb_key7     ; store with top bit set for getc
 
         ; restore control registers
         pla

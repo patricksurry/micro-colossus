@@ -1,3 +1,29 @@
+.section zp
+
+txt_strz    .word ?             ; input zero-terminated string
+txt_outz    .word ?             ; output buffer for zero-terminated string
+txt_digrams .word ?             ; digram lookup table (128 2-byte pairs)
+
+; unwrap temps
+txt_col     .byte ?
+txt_row     .byte ?
+wrp_col     .byte ?
+wrp_flg     .byte ?
+
+; woozy temps
+txt_repeat  .byte ?
+txt_shift   .byte ?
+txt_chr     .byte ?
+
+; dizzy temp
+txt_stack   .byte ?
+
+cb_head     .word ?, ?
+cb_tail     .word ?, ?
+
+.endsection
+
+
 txt_init:
         ; set up two circular one page buffers
         ; both buffers start with head=tail,
