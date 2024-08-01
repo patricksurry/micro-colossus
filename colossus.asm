@@ -53,7 +53,7 @@ TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 0
 TALI_OPTION_TERSE := 1
 
-TALI_USER_HEADERS := "../micro-colossus/headers.asm"
+TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 
 ; Make sure the above options are set BEFORE this include.
 
@@ -138,7 +138,7 @@ kernel_bye:
 ; is easier to see where the kernel ends in hex dumps. This string is
 ; displayed after a successful boot
 s_kernel_id:
-        .text "Tali Forth 2 Adventure 26Feb2024", 0
+        .text "Tali Forth 2 Adventure " .. GITSHA, 0
 
 
 ; Add the interrupt vectors
