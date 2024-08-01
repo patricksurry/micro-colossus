@@ -20,7 +20,7 @@ delay:  ; (A, Y) -> nil; X const
         dey         ; 2 cycles
         sbc #0      ; 2 cycles
         bcs delay   ; 2 cycles + 1 if branch occurs (same page)
-_delay12:
+delay12:
         rts         ; 6 cycles (+ 6 for call)
 
 
