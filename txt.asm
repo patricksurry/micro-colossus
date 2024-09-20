@@ -102,9 +102,16 @@ wrp_new_line:
 
 
 wrp_putc:   ; buffer output via cb0 to kernel_putc
+        ; enter with latest character in A which is also buffered
+        ; so will eventually be retrieved via cb0_get
+        ; the goal here is to track potential line and page breaks
+        ; and decide when to flush the buffer
+        ; currently always adds a newline following the string
+        ; (could be configurable but no current need)
         cmp #0
-        beq _force          ; force break if done, adding NL after each string
-        cmp #AscLF          ; hard LF?
+        beq _force          ; force break after each string
+
+        cmp #AscLF          ; explicit LF?
         bne _chkws
 
 _force: lda txt_col         ; wrap at this col
@@ -138,7 +145,7 @@ _flush: lda wrp_col         ; did we find a break?
         ; A contains the column index to wrap at.  We'll consume A+1
         ; characters, with the last one getting special treatment
 
-_putln: tay
+_putln: tay                 ; save number of characters for loop
         eor #$ff
         sec                 ; new column will be txt_col - A = ~A + 1 + col
         adc txt_col
@@ -146,12 +153,13 @@ _putln: tay
 
 _out:   jsr cb0_get         ; consume wrp_col+1 chars
         dey
-        bmi _last           ; handle last one specialy
+        bmi _last           ; last char gets special treatment
         jsr kernel_putc
         bra _out
 
-_last:  cmp #' '+1          ; is final char ws (incl terminator) ?
+_last:  cmp #' '+1          ; last character is whitespace ?
         bmi _nl
+
         jsr kernel_putc     ; else emit the non-ws character first
 _nl:    lda #AscLF          ; either way add a NL
         jsr kernel_putc
@@ -162,13 +170,15 @@ _nl:    lda #AscLF          ; either way add a NL
         jmp wrp_new_line    ; set state for new line and return
 
 ;TODO for debugging only
-_page:  lda #42
+_page:  lda #42                 ; show an asterisk
         jsr kernel_putc
 
         jmp kernel_getc     ; press a key and reset page wrap...
 
 
 txt_typez:   ;  (txt_strz, txt_digrams via buf1) -> buf0
+    ; print a dizzy+woozy encoded string in (txt_strz) using streaming decode
+    ; outputs via wrp_putc which always adds a trailing newline
     ; undo woozy prep for dizzy, pulls from buf1 (dizzy), pushes to buf0 (output)
         stz txt_shift       ; shift state, 0 = none, 1 = capitalize, 2 = all caps
         stz txt_repeat      ; repeat count for output (0 means once)
@@ -258,7 +268,7 @@ _rts:   rts
 
 
 
-.if TEST
+.if DEBUG
 
 test_start:
         lda #<test_digrams

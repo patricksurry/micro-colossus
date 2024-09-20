@@ -1,7 +1,3 @@
-; VIA is visible at (msb) 011. .... .... rrrr (lsb), ie. $6000 - $7FFF
-; with the lower four bits selecting register 0..15
-
-VIA := $6000
 
 VIA_IORB := VIA + $0    ; port a/b latches
 VIA_IORA := VIA + $1
@@ -17,20 +13,23 @@ VIA_IFR  := VIA + $d    ; interrupt flags
 VIA_IER  := VIA + $e    ; write bit 7 hi + bits to set, or bit 7 lo + bits to clear
 VIA_IORA_ := VIA + $f
 
-; NB writing IER is special: clear bits 0-6 by setting bit7=0 with 1s in bits to clear,
-; set bits 0-6 by setting bit7=1 with 1s in bits to set
 
-; two bits of PORTB select the active device on PORTA
-DVC_SLCT_MASK = %0000_1100
-DVC_SLCT_NONE = %0000_0000
-DVC_SLCT_SD   = %0000_0100
-DVC_SLCT_KBD  = %0000_1000
-DVC_SLCT_LCD  = %0000_1100
+; VIA is mapped at $c0xy where y = $0-f selects the VIA register
+; and x = $0-f selects the device to enable (typically to read/write on port A)
+; currently the upper two bits of x are ignored and the lower
+; Normally we can do all the control pin setup etc without enabling the
+; device, and then do the actual read/write through the device-enabled address
 
-DVC_DATA := VIA_IORA        ; LCD D0..7 data pins mapped to VIA PORTA D0..7
-DVC_DDR  := VIA_DDRA        ; set to 0 for read DATA, #$ff to write DATA
-DVC_CTRL := VIA_IORB        ; RS, RW, E mapped to port B pins 0, 1, 2
-DVC_CDR  := VIA_DDRB
+VIA_DVC_NIL = %00_0000  ; no device enabled
+VIA_DVC_LCD = %01_0000  ; screen enabled
+VIA_DVC_KBD = %10_0000  ; keyboard enabled
+VIA_DVC_SD  = %11_0000  ; SD card enabled
+
+DVC_CTRL    = VIA_IORB
+DVC_CDR     = VIA_DDRB
+
+DVC_DATA    = VIA_IORA  ; read/write with VIA_DVC_xxx to enable device
+DVC_DDR     = VIA_DDRA
 
 
 ; VIA_ACR flag values
@@ -58,7 +57,6 @@ VIA_T1_PB7_CTS  = %1100_0000
 VIA_IER_SET = %1000_0000    ; set accompanying set bits in IER
 VIA_IER_CLR = %0000_0000    ; clr accompanying set bits in IER
 
-VIA_INT_ANY = %1000_0000    ; set on any enabled interrupt
 VIA_INT_T1  = %0100_0000    ; set on T1 time out
 VIA_INT_T2  = %0010_0000    ; set on T2 time out
 VIA_INT_CB1 = %0001_0000    ; set on CB1 active edge
@@ -98,38 +96,11 @@ VIA_HS_CB2_LOW   = %1100_0000
 VIA_HS_CB2_HIGH  = %1110_0000
 
 
-DVC_SET_CTRL .macro val, mask
-        lda DVC_CTRL
-        and #(255 - \mask)
-        ora \val
-        sta DVC_CTRL
-    .endmacro
-
-.section zp
-
-via_tmp:    .byte ?
-
-.endsection
-
 
 via_init:    ; () -> nil const X, Y
-        ; all dev control bits are outputs
+        ; all dev control bits are outputs, initially 0
         stz DVC_CTRL
         lda #$ff
         sta DVC_CDR
         rts
-
-    .if 0
-rollpbbit:  ; () -> nil const X, Y
-    ; test routine that rolls a bit back and forth forever on port b
-        inc
-        sec
-_right: sta VIA_IORB
-        ror
-        bne _right
-_left:  sta VIA_IORB
-        rol
-        bne _left
-        bra _right
-    .endif
 

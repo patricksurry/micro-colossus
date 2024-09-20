@@ -98,7 +98,7 @@ lcd_bufp:       .word ?
 
 lcd_cmd:    ; (Y) -> nil const X
     ; fall through to lcd_do with Y = data
-    lda #LCD_CMD
+        lda #LCD_CMD
 
 lcd_do:     ; (A, Y) -> A const X
     ; perform the action A with data Y (for output actions)

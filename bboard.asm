@@ -6,28 +6,26 @@
         * = zpage_end + 1
 .dsection zp
 
-; Where to start Tali Forth 2 in ROM (or RAM if loading it)
-        * = $8000
-
 ram_end   = $3fff          ; end of installed RAM
 
 
-; OPTIONAL WORDSETS
+; Where to start Tali Forth 2 in ROM (or RAM if loading it)
+        * = $8000
 
 ; For our minimal build, we'll drop all the optional words
 
-; TALI_OPTIONAL_WORDS := [ "ed", "editor", "ramdrive", "block", "environment?", "assembler", "disassembler", "wordlist" ]
 TALI_OPTIONAL_WORDS := [ "disassembler" ]
 TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 1
 TALI_OPTION_TERSE := 0
 
-; TALI_USER_HEADERS := "../micro-colossus/headers.asm"
+TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 
-; Make sure the above options are set BEFORE this include.
+; Make sure TALI_xxx options are set BEFORE this include.
 
 .include "../tali/taliforth.asm" ; zero page variables, definitions
 
+AscFF       = $0f               ; form feed
 AscTab      = $09               ; tab
 
     .include "via.asm"
@@ -44,8 +42,13 @@ AscTab      = $09               ; tab
 ; =====================================================================
 ; FINALLY
 
-kernel_getc = kb_getc
-kernel_putc = lcd_putc
+kernel_getc = kb_getc           ; preserves X and Y
+
+kernel_putc:
+        phy
+        jsr lcd_putc            ; only preserves X
+        ply
+        rts
 
 kernel_init:
         ; """Initialize the hardware. This is called with a JMP and not

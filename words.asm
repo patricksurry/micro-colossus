@@ -394,6 +394,9 @@ z_decode_link:
 ; ## typez ( strz digrams -- ) "emit a wrapped dizzy+woozy encoded string"
 ; ## "typez"  tested ad hoc
 xt_typez:
+        lda (2,x)
+        beq _empty              ; skip empty string to avoid a newline
+
         lda 0,x
         sta txt_digrams
         lda 1,x
@@ -405,8 +408,10 @@ xt_typez:
         sta txt_strz+1
 
         phx
-        jsr txt_typez
+        jsr txt_typez           ; print encoded string plus trailing newline
         plx
+
+_empty:
         inx
         inx
         inx
