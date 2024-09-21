@@ -2,3 +2,5 @@ c65-*
 *.rom
 *.lst
 *.sym
+*.log
+.c65

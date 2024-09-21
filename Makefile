@@ -1,6 +1,7 @@
 GITSHA := "$(shell git describe --abbrev=4 --dirty --always --tags)"
 
-all: colossus.rom bb1.rom bb2.rom
+all: colossus.rom
+# bb1.rom bb2.rom
 
 colossus.rom: $(wildcard *.asm)
 	64tass -C --nostart --labels=colossus.sym --list=colossus.lst --output $@ colossus.asm -D ARCH=\"sim\" -D GITSHA=\"${GITSHA}\"
