@@ -43,14 +43,13 @@ Hardware setup:
 
 /WR = /IOW
 /RD = /IOR
-/CE = /LCD                      ; address VIA as $c01x
-C/D = PB0                       ; high for cmd/status, low for data
+/CE = a7                        ; address LCD as $c000
+C/D = a0                        ; high for cmd/status, low for data
 
 .endcomment
 
-LCD_C_D = %0000_0001            ; C/D is pin PB0 so we can inc/dec to change state
-
-LCD_DATA = address(DVC_DATA | VIA_DVC_LCD)   ; r/w PORTA with /CE
+LCD_DATA   = IOBASE
+LCD_CMD    = IOBASE + 1
 
 LCD_ST_RDY = %0011              ; status masks for normal command
 LCD_ST_ARD = %0100              ; and auto read/write specials
@@ -70,9 +69,6 @@ lcd_tmp     .byte ?
 lcd_init:   ; () -> nil const X
         ; NB. assumes all DVC_CDR pins are already set as output
 
-        lda #LCD_C_D            ; all lcd_xxx assume C_D is set on entry
-        tsb DVC_CTRL            ; so ensure that that is the case
-
         stz lcd_args
         stz lcd_args+1
         ldy #%0100_0000         ; text base $0000
@@ -88,6 +84,7 @@ lcd_init:   ; () -> nil const X
         stz lcd_args+1          ; 0 high
         ldy #%0100_0001         ; text area (row offset)
         jsr lcd_cmd2
+
         ldy #%0100_0011         ; ditto for gfx area (row offset)
         jsr lcd_cmd2
 
@@ -112,15 +109,12 @@ lcd_cls:   ; () -> nil const X
         ldy #%1011_0000         ; data auto-write
         jsr lcd_cmd0
 
-;TODO
-        lda #1                  ; clear pages $0000 thru $06ff to cover txt $0-27f and gfx $400-67f
+        lda #7                  ; clear pages $0000 thru $06ff to cover txt $0-27f and gfx $400-67f
         sta lcd_tmp
         ldy #0                  ; count each page 0-ff
 -
         jsr lcd_wait_auto       ; OK to send?
-        dec DVC_CTRL            ; clear C_D for data
         stz LCD_DATA            ; write $00 and inc ADP
-        inc DVC_CTRL            ; set C_D for cmd
         dey
         bne -
 
@@ -185,10 +179,8 @@ lcd_cmdn:
         ldx #0
 -
         jsr lcd_wait            ; leaves C_D set
-        dec DVC_CTRL            ; clear C_D for data
         lda lcd_args,x
         sta LCD_DATA            ; write data byte to LCD
-        inc DVC_CTRL            ; set C_D for command
         bcc +
 
         clc
@@ -200,8 +192,8 @@ lcd_cmdn:
 
 lcd_cmd0:   ; (Y) -> nil const X
     ; Y = cmd
-        jsr lcd_wait            ; leaves C_D set
-        sty LCD_DATA            ; write command byte to LCD
+        jsr lcd_wait
+        sty LCD_CMD            ; write command byte to LCD
         rts
 
 
@@ -218,9 +210,7 @@ lcd_puts:
 .endif
         sec
         sbc #$20
-        dec DVC_CTRL            ; clear C_D for data
         sta LCD_DATA            ; write byte and inc ADP
-        inc DVC_CTRL            ; set C_D for cmd
         inc lcd_args
         bne -
         inc lcd_args+1
@@ -232,29 +222,26 @@ _done:
 
 
 lcd_wait:   ; () -> nil const X, Y
-    ; Read LCD control status until ready
-        clc
-        .byte $24               ; skip sec
-lcd_wait_auto:   ; () -> nil const X, Y
-        sec
-
-        stz DVC_DDR             ; read data pins
+    ; Read LCD control status until ready for command
 -
-        lda LCD_DATA            ; read status
-        bcs _auto               ; auto or regular?
+        lda LCD_CMD             ; read status
 
         and #LCD_ST_RDY         ; check both bits are set
         eor #LCD_ST_RDY         ; mask and then eor so 0 if set
 .if !SIMULATOR
         bne -
 .endif
-        beq _done
-_auto:
+        rts
+
+
+lcd_wait_auto:   ; () -> nil const X, Y
+    ; Read LCD control status until ready for auto write
+-
+        lda LCD_CMD             ; read status
         and #LCD_ST_AWR         ; wait for auto write status bit
 .if !SIMULATOR
         beq -
 .endif
-_done:
-        dec DVC_DDR             ; invert data pins to $ff for write
         rts
+
 

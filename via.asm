@@ -1,16 +1,17 @@
+VIA = IOBASE + $80              ; VIA CS2 is address bit a7
 
-VIA_IORB    = address(VIA + $0)    ; port a/b latches
+VIA_IORB    = address(VIA + $0) ; port a/b latches
 VIA_IORA    = address(VIA + $1)
-VIA_DDRB    = address(VIA + $2)    ; data direction for port a/b pins (1=output, 0=input`)
+VIA_DDRB    = address(VIA + $2) ; data direction for port a/b pins (1=output, 0=input`)
 VIA_DDRA    = address(VIA + $3)
-VIA_T1C     = address(VIA + $4)    ; timer 1 lo/hi counter
-VIA_T1L     = address(VIA + $6)    ; timer 1 latches
-VIA_T2C     = address(VIA + $8)    ; timer 2 lo/hi counter
-VIA_SR      = address(VIA + $a)    ; shift register (timers, shift, port a/b latching)
-VIA_ACR     = address(VIA + $b)    ; aux control register
-VIA_PCR     = address(VIA + $c)    ; peripheral control register (r/w handshake mode for C[AB][12])
-VIA_IFR     = address(VIA + $d)    ; interrupt flags
-VIA_IER     = address(VIA + $e)    ; write bit 7 hi + bits to set, or bit 7 lo + bits to clear
+VIA_T1C     = address(VIA + $4) ; timer 1 lo/hi counter
+VIA_T1L     = address(VIA + $6) ; timer 1 latches
+VIA_T2C     = address(VIA + $8) ; timer 2 lo/hi counter
+VIA_SR      = address(VIA + $a) ; shift register (timers, shift, port a/b latching)
+VIA_ACR     = address(VIA + $b) ; aux control register
+VIA_PCR     = address(VIA + $c) ; peripheral control register (r/w handshake mode for C[AB][12])
+VIA_IFR     = address(VIA + $d) ; interrupt flags
+VIA_IER     = address(VIA + $e) ; write bit 7 hi + bits to set, or bit 7 lo + bits to clear
 VIA_IORA_   = address(VIA + $f)
 
 
@@ -21,7 +22,7 @@ VIA_IORA_   = address(VIA + $f)
 ; device, and then do the actual read/write through the device-enabled address
 
 VIA_DVC_NIL = %00_0000  ; no device enabled
-VIA_DVC_LCD = %01_0000  ; screen enabled
+;             %01_0000  ; unused
 VIA_DVC_KBD = %10_0000  ; keyboard enabled
 VIA_DVC_SD  = %11_0000  ; SD card enabled
 
