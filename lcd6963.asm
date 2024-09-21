@@ -48,9 +48,9 @@ C/D = PB0                       ; high for cmd/status, low for data
 
 .endcomment
 
-LCD_C_D = %0000_0001            ; C/D is pin PB0
+LCD_C_D = %0000_0001            ; C/D is pin PB0 so we can inc/dec to change state
 
-LCD_DATA  = DVC_DATA | VIA_DVC_LCD   ; r/w PORTA with /CE
+LCD_DATA = address(DVC_DATA | VIA_DVC_LCD)   ; r/w PORTA with /CE
 
 LCD_ST_RDY = %0011              ; status masks for normal command
 LCD_ST_ARD = %0100              ; and auto read/write specials
@@ -69,6 +69,9 @@ lcd_tmp     .byte ?
 
 lcd_init:   ; () -> nil const X
         ; NB. assumes all DVC_CDR pins are already set as output
+
+        lda #LCD_C_D            ; all lcd_xxx assume C_D is set on entry
+        tsb DVC_CTRL            ; so ensure that that is the case
 
         stz lcd_args
         stz lcd_args+1
@@ -114,11 +117,10 @@ lcd_cls:   ; () -> nil const X
         sta lcd_tmp
         ldy #0                  ; count each page 0-ff
 -
-        jsr lcd_wait_auto      ; OK to send?
-        lda #LCD_C_D
-        trb DVC_CTRL            ; clear C_D for data
+        jsr lcd_wait_auto       ; OK to send?
+        dec DVC_CTRL            ; clear C_D for data
         stz LCD_DATA            ; write $00 and inc ADP
-
+        inc DVC_CTRL            ; set C_D for cmd
         dey
         bne -
 
@@ -178,14 +180,15 @@ lcd_cmd1:   ; (Y) -> nil const X
     ; Y = cmd; data in lcd_args+0
         clc
 lcd_cmdn:
+
         phx
         ldx #0
 -
-        jsr lcd_wait
-        lda #LCD_C_D
-        trb DVC_CTRL            ; clear C_D for data
+        jsr lcd_wait            ; leaves C_D set
+        dec DVC_CTRL            ; clear C_D for data
         lda lcd_args,x
         sta LCD_DATA            ; write data byte to LCD
+        inc DVC_CTRL            ; set C_D for command
         bcc +
 
         clc
@@ -208,22 +211,21 @@ lcd_puts:
         jsr lcd_cmd0
 -
         jsr lcd_wait_auto       ; OK to send?
-        lda #LCD_C_D
-        trb DVC_CTRL            ; clear C_D for data
         lda (lcd_args)
-        beq +
+        beq _done
 .if SIMULATOR
         sta $d001
 .endif
         sec
         sbc #$20
+        dec DVC_CTRL            ; clear C_D for data
         sta LCD_DATA            ; write byte and inc ADP
-
+        inc DVC_CTRL            ; set C_D for cmd
         inc lcd_args
         bne -
         inc lcd_args+1
         bra -
-+
+_done:
         ; seems to work either with wait-auto or regular wait (lcd_cmd0)
         ldy #%1011_0010         ; end auto-write
         bra lcd_cmd0
@@ -237,8 +239,6 @@ lcd_wait_auto:   ; () -> nil const X, Y
         sec
 
         stz DVC_DDR             ; read data pins
-        lda #LCD_C_D
-        tsb DVC_CTRL            ; set C_D for command
 -
         lda LCD_DATA            ; read status
         bcs _auto               ; auto or regular?

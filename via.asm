@@ -1,17 +1,17 @@
 
-VIA_IORB := VIA + $0    ; port a/b latches
-VIA_IORA := VIA + $1
-VIA_DDRB := VIA + $2    ; data direction for port a/b pins (1=output, 0=input`)
-VIA_DDRA := VIA + $3
-VIA_T1C  := VIA + $4    ; timer 1 lo/hi counter
-VIA_T1L  := VIA + $6    ; timer 1 latches
-VIA_T2C  := VIA + $8    ; timer 2 lo/hi counter
-VIA_SR   := VIA + $a    ; shift register (timers, shift, port a/b latching)
-VIA_ACR  := VIA + $b    ; aux control register
-VIA_PCR  := VIA + $c    ; peripheral control register (r/w handshake mode for C[AB][12])
-VIA_IFR  := VIA + $d    ; interrupt flags
-VIA_IER  := VIA + $e    ; write bit 7 hi + bits to set, or bit 7 lo + bits to clear
-VIA_IORA_ := VIA + $f
+VIA_IORB    = address(VIA + $0)    ; port a/b latches
+VIA_IORA    = address(VIA + $1)
+VIA_DDRB    = address(VIA + $2)    ; data direction for port a/b pins (1=output, 0=input`)
+VIA_DDRA    = address(VIA + $3)
+VIA_T1C     = address(VIA + $4)    ; timer 1 lo/hi counter
+VIA_T1L     = address(VIA + $6)    ; timer 1 latches
+VIA_T2C     = address(VIA + $8)    ; timer 2 lo/hi counter
+VIA_SR      = address(VIA + $a)    ; shift register (timers, shift, port a/b latching)
+VIA_ACR     = address(VIA + $b)    ; aux control register
+VIA_PCR     = address(VIA + $c)    ; peripheral control register (r/w handshake mode for C[AB][12])
+VIA_IFR     = address(VIA + $d)    ; interrupt flags
+VIA_IER     = address(VIA + $e)    ; write bit 7 hi + bits to set, or bit 7 lo + bits to clear
+VIA_IORA_   = address(VIA + $f)
 
 
 ; VIA is mapped at $c0xy where y = $0-f selects the VIA register
