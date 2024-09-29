@@ -162,6 +162,9 @@ txt_puts:
 txt_scrollup:
         ; not safe to use Forth words that change tmps since this might be called any time
 
+        lda #21
+        jsr delay               ; delay about 50ms
+
 ;TODO is the 5*128 scheme better?
 
         lda #>TXT_BUFFER        ; starting address

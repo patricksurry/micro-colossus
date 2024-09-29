@@ -4,14 +4,12 @@
 #nt_header randint
 #nt_header tolower
 #nt_header asciiz, "asciiz>"
-#nt_header sd_init, "sd-init"
+#nt_header block_sd_init, "sd-init"
 #nt_header sd_blk_read, "sd-blk-read"
 .if ARCH == "sim"
-#nt_header blk_read, "blk-read"
-#nt_header blk_write, "blk-write"
-#nt_header blk_boot, "blk-boot"
-#nt_header blk_read_n, "blk-read-n"
-#nt_header blk_write_n, "blk-write-n"
+#nt_header block_boot, "block-boot"
+#nt_header block_read_n, "block-read-n"
+#nt_header block_write_n, "block-write-n"
 .endif
 #nt_header unpack
 #nt_header pack

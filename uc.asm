@@ -11,7 +11,10 @@ TESTS           = 0             ; enable tests?
 
 ; For our minimal build, we'll drop all the optional words
 
-TALI_OPTIONAL_WORDS := [ ]      ; [ "disassembler" ]
+.if ARCH == "sim"
+TALI_ARCH := "c65"
+.endif
+TALI_OPTIONAL_WORDS := [ "block" ]      ; [ "disassembler" ]
 TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 0
 TALI_OPTION_TERSE := 1
@@ -130,7 +133,7 @@ kernel_init:
 
 ;TODO
 .if ARCH = "sim"
-        jmp xt_blk_boot
+        jmp xt_block_boot
 .else
         rts
 .endif

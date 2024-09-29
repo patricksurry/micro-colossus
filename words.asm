@@ -202,7 +202,8 @@ z_asciiz:
 
 .include "sd.asm"
 
-xt_sd_init:
+xt_block_sd_init:
+w_block_sd_init:
         ; low level SD card init
         dex
         dex
@@ -218,7 +219,7 @@ set_sd_status:
         plx
         sta 0,x
         sty 1,x
-z_sd_init:
+z_block_sd_init:
         rts
 
 xt_sd_blk_read:
@@ -248,99 +249,72 @@ xt_sd_blk_read:
 z_sd_blk_read:
 
 
-.if ARCH == "sim"
-
 blk_loader = $400
 
-; ## blk_write ( blk buf -- ) "write a 1024-byte block from buf to blk"
-; ## "blk-write"  tested ad hoc
-xt_blk_write:
-        ldy #2
-        bra jsr_blkrw
+.section zp
+blk_n   .byte ?
+blk_rw  .byte ?
+.endsection
 
-; ## blk_read ( blk buf -- ) "read a 1024-byte block from blk to buf"
-; ## "blk-read"  tested ad hoc
-xt_blk_read:
+; block-write-n ( addr blk n ) loop over block-write n times (n <= 64)
+xt_block_write_n:
         ldy #1
-jsr_blkrw:
-        jsr blkrw
-        inx             ; free stack
-        inx
-        inx
-        inx
-z_blk_write:
-z_blk_read:
-        rts
-
-
-blkrw:      ; ( blk buf -- blk buf ) ; Y = 1/2 for r/w
-        lda 0,x
-        sta io_blk_buffer
-        lda 1,x
-        sta io_blk_buffer+1
-        lda 2,x
-        sta io_blk_number
-        lda 3,x
-        sta io_blk_number+1
-        sty io_blk_action
-        rts
-
-
-; blk-write-n ( blk addr n ) loop over blk_write n times (n <= 64)
-xt_blk_write_n:
-        ldy #2
         bra blk_rw_n
 
-; blk-read-n ( blk addr n ) loop over blk_read n times (n <= 64)
-xt_blk_read_n:
-        ldy #1
+; block-read-n ( addr blk n ) loop over block-read n times (n <= 64)
+xt_block_read_n:
+        ldy #0
 blk_rw_n:
-        sty tmp1+1      ; 1=read, 2=write
+        sty blk_rw              ; 0=read, 1=write
 
         lda 0,x
-        sta tmp1        ; block count (unsigned byte)
-        inx             ; remove n from stack
+        sta blk_n               ; block count (unsigned byte)
+        inx                     ; remove n from stack
         inx
-        cmp #0          ; any blocks to read?
+        cmp #0                  ; any blocks to read?
         beq _cleanup
 
 _loop:
-        ldy tmp1+1
-        jsr blkrw
-
-        lda #4          ; addr += 1024 = $400
-        clc
-        adc 1,x
-        sta 1,x
-
-        inc 2,x         ; blk += 1
-        bne +
-        inc 3,x
+        jsr w_two_dup           ; ( addr blk addr blk )
+        ldy blk_rw
+        beq _rd
+        jsr w_block_write
+        bra +
+_rd:
+        jsr w_block_read
 +
-        dec tmp1        ; n--
+        lda #4                  ; addr += 1024 = $400
+        clc
+        adc 3,x
+        sta 3,x
+
+        inc 0,x                 ; blk += 1
+        bne +
+        inc 1,x
++
+        dec blk_n               ; n--
         bne _loop
 
 _cleanup:
-        inx             ; clear stack
-        inx
-        inx
-        inx
-z_blk_read_n:
-z_blk_write_n:
-        rts
+        jmp w_two_drop
+z_block_read_n:
+z_block_write_n:
 
 
-xt_blk_boot:
-; TODO make this work for both SD and simulator
-        lda #$ff
-        sta io_blk_status
-        lda #$0
-        sta io_blk_action
-        lda io_blk_status
-        beq _chkfmt
+xt_block_boot:
+.if ARCH == "sim"
+        jsr w_block_c65_init    ; return t/f status
+.else
+        jsr w_block_sd_init
+.endif
 
-        lda #<_enodev
-        ldy #>_enodev
+        dex
+        dex
+        lda $fe,x
+        bne _chkfmt
+
+        lda #<_enoblk
+        ldy #>_enoblk
 _err:
         sta tmp3
         sty tmp3+1
@@ -352,20 +326,21 @@ _badblk:
         ldy #>_ebadblk
         bra _err
 
-_enodev:
-        .shift "no block device"
+_enoblk:
+        .shift "block init failed"
 _ebadblk:
         .shift "bad boot block"
 
 _chkfmt:
-        jsr xt_zero             ; 0 <blk_loader> blk-read
+
         dex
         dex
         lda #<blk_loader
         sta 0,x
         lda #>blk_loader
         sta 1,x
-        jsr xt_blk_read
+        jsr xt_zero
+        jsr w_block_read        ; <blk_loader> 0 block-read
 
         ; valid boot block looks like TF<length16><code...>
         lda blk_loader
@@ -387,10 +362,8 @@ _chkfmt:
         lda blk_loader+3
         sta 1,x
         jmp xt_evaluate
+z_block_boot:
 
-z_blk_boot:
-
-.endif
 
 ; linkz decode 4 byte packed representation into 3 words
 ; ( link-addr -- dest' verb cond' )
