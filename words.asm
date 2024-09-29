@@ -200,10 +200,55 @@ z_asciiz:
         rts
 
 
-blk_action = $c010
-blk_status = $c011
-blk_number = $c012
-blk_buffer = $c014
+.include "sd.asm"
+
+xt_sd_init:
+        ; low level SD card init
+        dex
+        dex
+        phx
+
+        jsr sd_init             ; try to init SD card
+set_sd_status:
+        bne +
+        tax                     ; A=X=0 on success
++
+        phx
+        ply
+        plx
+        sta 0,x
+        sty 1,x
+z_sd_init:
+        rts
+
+xt_sd_blk_read:
+    ; sd-blk-read ( udblk buf -- status )
+    ; read the 512-byte with 32-bit index sd_blk to sd_bufp
+        lda 0,x
+        sta sd_bufp
+        lda 1,x
+        sta sd_bufp+1
+
+        lda 2,x                 ; udblk is stored in NUXI order on the stack
+        sta sd_blk+2            ; but we need XINU (litte endian) in sd_blk
+        lda 3,x
+        sta sd_blk+3
+        lda 4,x
+        sta sd_blk
+        lda 5,x
+        sta sd_blk+1
+        inx
+        inx
+        inx
+        inx
+
+        phx
+        jsr sd_readblock
+        jmp set_sd_status
+z_sd_blk_read:
+
+
+.if ARCH == "sim"
 
 blk_loader = $400
 
@@ -230,14 +275,14 @@ z_blk_read:
 
 blkrw:      ; ( blk buf -- blk buf ) ; Y = 1/2 for r/w
         lda 0,x
-        sta blk_buffer
+        sta io_blk_buffer
         lda 1,x
-        sta blk_buffer+1
+        sta io_blk_buffer+1
         lda 2,x
-        sta blk_number
+        sta io_blk_number
         lda 3,x
-        sta blk_number+1
-        sty blk_action
+        sta io_blk_number+1
+        sty io_blk_action
         rts
 
 
@@ -284,12 +329,14 @@ z_blk_read_n:
 z_blk_write_n:
         rts
 
+
 xt_blk_boot:
+; TODO make this work for both SD and simulator
         lda #$ff
-        sta blk_status
+        sta io_blk_status
         lda #$0
-        sta blk_action
-        lda blk_status
+        sta io_blk_action
+        lda io_blk_status
         beq _chkfmt
 
         lda #<_enodev
@@ -306,9 +353,9 @@ _badblk:
         bra _err
 
 _enodev:
-        .text "no block device", 0
+        .shift "no block device"
 _ebadblk:
-        .text "bad boot block", 0
+        .shift "bad boot block"
 
 _chkfmt:
         jsr xt_zero             ; 0 <blk_loader> blk-read
@@ -343,6 +390,7 @@ _chkfmt:
 
 z_blk_boot:
 
+.endif
 
 ; linkz decode 4 byte packed representation into 3 words
 ; ( link-addr -- dest' verb cond' )

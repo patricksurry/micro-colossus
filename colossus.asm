@@ -69,14 +69,13 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 AscFF       = $0f               ; form feed
 AscTab      = $09               ; tab
 
-.if ARCH != "sim"
     .include "via.asm"
     .include "morse.asm"
     .include "speaker.asm"
     .include "kb.asm"
     .include "lcd.asm"
     .include "sd.asm"
-.endif
+
     .include "util.asm"
     .include "txt.asm"
     .include "words.asm"

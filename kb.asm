@@ -26,7 +26,7 @@ kb_init:    ; () -> nil const X, Y
 
 kb_getc:    ; () -> A const X, Y
     ; wait for a keypress to appear in kb_key7 and return with bit 7 clear
-.if !SIMULATOR
+.if ARCH != "sim"
         lda kb_key7             ; has top-bit set on ready
         bpl kb_getc
 .else

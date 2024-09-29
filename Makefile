@@ -1,14 +1,18 @@
 GITSHA := "$(shell git describe --abbrev=4 --dirty --always --tags)"
 
-all: colossus.rom
+all: uc.rom ucs.rom
 # bb1.rom bb2.rom
 
 colossus.rom: $(wildcard *.asm)
 	64tass -C --nostart --labels=colossus.sym --list=colossus.lst --output $@ colossus.asm -D ARCH=\"sim\" -D GITSHA=\"${GITSHA}\"
 
-test.rom: $(wildcard *.asm)
-	64tass -C --nostart --vice-labels --labels=test.sym --list=test.lst --output $@ test.asm
-	sort -o test.sym test.sym
+uc.rom: $(wildcard *.asm)
+	64tass -C --nostart --vice-labels --labels=uc.sym --list=uc.lst --output $@ uc.asm -D ARCH=\"bb2\" -D GITSHA=\"${GITSHA}\"
+	python3 scripts/sortsym.py uc.sym
+
+ucs.rom: $(wildcard *.asm)
+	64tass -C --nostart --vice-labels --labels=ucs.sym --list=ucs.lst --output $@ uc.asm -D ARCH=\"sim\" -D GITSHA=\"${GITSHA}\"
+	python3 scripts/sortsym.py ucs.sym
 
 bb1.rom: $(wildcard *.asm)
 	64tass -C --nostart --labels=bb1.sym --list=bb1.lst --output $@ colossus.asm -D ARCH=\"bb1\" -D GITSHA=\"${GITSHA}\"
