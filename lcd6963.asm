@@ -111,6 +111,18 @@ lcd_cmd2:   ; (Y) -> nil const X
         bra lcd_cmdn
 
 
+lcd_hide_cursor:
+        ldy #%1001_1100         ; display:  gfx (text attr) on, text on, cursor off
+        bra lcd_cmd0
+
+lcd_show_cursor:
+    ; show cursor at (X, Y) = (lcd_args, lcd_args+1)
+        ldy #%0010_0001         ; set cursor pointer
+        jsr lcd_cmd2
+
+        ldy #%1001_1111         ; display: gfx (text attr) on, text on, cursor blink
+        bra lcd_cmd0
+
 lcd_putc:   ; (A) -> nil const X
     ; write A to ADP++
 .if ARCH == "sim"
@@ -152,19 +164,6 @@ lcd_cmd0:   ; (Y) -> nil const X
         rts
 
 
-lcd_hide_cursor:
-        ldy #%1001_1100         ; display:  gfx (text attr) on, text on, cursor off
-        bra lcd_cmd0
-
-lcd_show_cursor:
-    ; show cursor at (X, Y) = (lcd_args, lcd_args+1)
-        ldy #%0010_0001         ; set cursor pointer
-        jsr lcd_cmd2
-
-        ldy #%1001_1111         ; display: gfx (text attr) on, text on, cursor blink
-        bra lcd_cmd0
-
-
 lcd_blit:
     ; write 640 chars of character data from <Y,A> to the LCD
         pha
@@ -176,7 +175,7 @@ lcd_blit:
         lda #%10101             ; 5 iterations, page++ every other loop
         sta lcd_tmp
 
-        ldy #%1011_0000         ; data auto-write
+        ldy #%1011_0000         ; start auto-write
         jsr lcd_cmd0
 
         ply
@@ -198,8 +197,13 @@ _txt:
 
         iny
         bpl -
+
+        lda lcd_args
+        eor #$80                ; next half page
+        sta lcd_args
         lsr lcd_tmp
         bcs _txt                ; inc page after even steps
+
         beq +
         inc lcd_args+1
         bra _txt
@@ -218,7 +222,7 @@ _txt:
         lda #%10101             ; 5 iterations, page++ every other loop
         sta lcd_tmp
 
-        ldy #%1011_0000         ; data auto-write
+        ldy #%1011_0000         ; start auto-write
         jsr lcd_cmd0
 
 _attr:
@@ -233,8 +237,11 @@ _attr:
         iny
         bpl -
 
+        lda lcd_args
+        eor #$80                ; next half page
         lsr lcd_tmp
         bcs _attr               ; inc page after even steps
+
         beq +
         inc lcd_args+1
         bra _attr

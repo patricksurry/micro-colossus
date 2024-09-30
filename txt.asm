@@ -142,8 +142,14 @@ _fill:  lda #' '                ; fill until txt_x zeros all bits in mask
         lda txt_x
         and txt_tmp
         bne _fill               ; done fill?
-        bit txt_tmp
-        bmi txt_scrollup        ; force the scroll on explicit NL
+
+        bit txt_tmp             ; was it NL (all bits set?)
+        bpl _done
+
+        lda txt_y               ; if NL and scroll due, force it now
+        cmp #TXT_HEIGHT
+        bpl txt_scrollup
+
 _done:  rts
 
 
@@ -161,9 +167,6 @@ txt_puts:
 
 txt_scrollup:
         ; not safe to use Forth words that change tmps since this might be called any time
-
-        lda #21
-        jsr delay               ; delay about 50ms
 
 ;TODO is the 5*128 scheme better?
 

@@ -171,8 +171,9 @@ sd_readbyte:   ; () -> A; X,Y const
         rts                     ; 6 cycles
 
 
+;TODO could we inline this everywhere?
 sd_writebyte:  ; (A) -> nil; A,X,Y const
-    ; writes A -> SD which reads SD -> DVC_DATA
+    ; writes A -> SD which reads SD -> external SR for SD_DATA
         ; VIA write triggers SR exchange
         sta VIA_SR              ; 4 cycles
         rts                     ; 6 cycles
@@ -254,7 +255,7 @@ sd_readblock:
         ldx #$dd                ;TODO
 
         jsr sd_await            ; wait for data start token #
-        ina
+        ina                     ; A=$fe on success, +2 => 0
         ina
         bne sd_exit
 
@@ -282,7 +283,7 @@ _crc:
         dec sd_bufp+1           ; restore buffer pointer
 
         ;TODO check crc-16
-        lda DVC_DATA            ; first byte of crc-16
+        lda SD_DATA             ; first byte of crc-16
         jsr sd_readbyte         ; second byte of crc-16
 
         lda #0                  ; success
