@@ -165,17 +165,10 @@ sd_exit:
 sd_readbyte:   ; () -> A; X,Y const
     ; trigger an SPI byte exchange and return the result
         lda #$ff                ; write a noop byte to exchange SR
-        jsr sd_writebyte
+        sta VIA_SR              ; A -> VIA SR -> SD triggers SD -> ext SR; then lda SD_DATA
         jsr delay12             ; 12 cycles
+        nop                     ; 2 cycles giving 14 between SR out -> start of lda SD_DATA
         lda SD_DATA             ; 4 cycles
-        rts                     ; 6 cycles
-
-
-;TODO could we inline this everywhere?
-sd_writebyte:  ; (A) -> nil; A,X,Y const
-    ; writes A -> SD which reads SD -> external SR for SD_DATA
-        ; VIA write triggers SR exchange
-        sta VIA_SR              ; 4 cycles
         rts                     ; 6 cycles
 
 
@@ -235,19 +228,21 @@ sd_readblock:
         trb DVC_CTRL
 
         lda #(17 | $40)         ; command 17, arg is block num, crc not checked
-        jsr sd_writebyte
+        sta VIA_SR              ; A -> VIA SR -> SD
+        jsr delay12             ; need 18 cycles before next write
 
-        ldy #3
+        ldy #3                  ;2
 -
-        lda sd_blk,y            ; send little endian block index in big endian order
-        jsr sd_writebyte
-        dey
-        bpl -
+        lda sd_blk,y            ;4  send little endian block index in big endian order
+        sta VIA_SR              ;4  A -> VIA SR -> SD
+        jsr delay12             ;12  (though 9 would be enough)
+        dey                     ;2
+        bpl -                   ;3/2
 
         ldx #$ee                ;TODO
 
         lda #1                  ; send CRC 0 with termination bit
-        jsr sd_writebyte
+        sta VIA_SR
         jsr sd_await
         cmp #0
         bne sd_exit             ; 0 -> success; else return error
