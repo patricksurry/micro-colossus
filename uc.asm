@@ -130,7 +130,8 @@ kernel_init:
         lda #>s_kernel_id
         sta txt_str+1
         jsr txt_puts
-
+        rts
+;TODO
         jmp xt_block_boot
 
 

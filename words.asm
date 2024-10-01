@@ -243,7 +243,14 @@ w_block_sd_init:
         jsr w_block_read_vector
         jsr w_store
 
-        ;TODO write vector not supported yet
+        dex                     ; set block write vector
+        dex
+        lda #<sd_blk_write
+        sta 0,x
+        lda #>sd_blk_write
+        sta 1,x
+        jsr w_block_write_vector
+        jsr w_store
 
 z_block_sd_init:
         rts
@@ -281,6 +288,16 @@ sd_blk_read:    ; ( addr u -- )
         jsr sd_readblock
 _done:
         plx
+        rts
+
+
+sd_blk_write:    ; ( addr u -- )
+    ; write 1024 bytes from addr to 16-bit block, corresponding to two 512 byte SD blocks.
+        inx
+        inx
+        inx
+        inx
+        ; TODO ... sd_writeblock ...
         rts
 
 

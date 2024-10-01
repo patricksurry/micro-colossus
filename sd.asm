@@ -153,13 +153,7 @@ _fail:
         tax                     ; X has failing command
         tya                     ; A has error code
 
-sd_exit:
-        ; disable the card, returning status in A (0 = OK)
-        tay
-        lda #SD_CS
-        tsb DVC_CTRL
-        tya
-        rts
+        bra sd_exit
 
 
 sd_readbyte:   ; () -> A; X,Y const
@@ -218,6 +212,13 @@ sd_await:
 
         rts
 
+sd_exit:
+        ; disable the card, returning status in A (0 = OK)
+        tay
+        lda #SD_CS
+        tsb DVC_CTRL
+        tya
+        rts
 
 sd_readblock:
     ; read the 512-byte with 32-bit index sd_blk to sd_bufp
@@ -232,15 +233,17 @@ sd_readblock:
         sta VIA_SR              ; A -> VIA SR -> SD
         jsr delay12             ; need 18 cycles before next write
 
-        ldy #3                  ;2
-        sec                     ;2
+        ldx #3                  ;2
 -
-        lda sd_blk,y            ;4  send little endian block index in big endian order
+        lda sd_blk,x            ;4  send little endian block index in big endian order
         sta VIA_SR              ;4  A -> VIA SR -> SD
-        adc #0                  ;2  increment blk for next call
-        sta sd_blk,y            ;5
-        dey                     ;2
+        jsr delay12             ;12  a little overkill for 18 total
+        dex                     ;2
         bpl -                   ;3/2
+-
+        inx                     ; sd_blk++
+        inc sd_blk,x
+        beq -
 
         ldx #$ee                ;TODO
 
@@ -284,13 +287,13 @@ _crc:
         jsr sd_readbyte         ; second byte of crc-16
 
         lda #0                  ; success
-        jmp sd_exit
+        bra sd_exit
 
 
 sd_writeblock:
     ;TODO write the 512-byte with 32-bit index sd_blk to sd_bufp
         lda #0
-        jmp sd_exit
+        bra sd_exit
 
 
 ; see command descriptions at https://chlazza.nfshost.com/sdcardinfo.html
