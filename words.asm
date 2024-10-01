@@ -1,5 +1,7 @@
 xt_le:
-        jsr xt_greater_than
+        jsr underflow_2
+w_le:
+        jsr w_greater_than
         lda 0,x
         eor #$ff
         sta 0,x
@@ -8,7 +10,9 @@ z_le:
         rts
 
 xt_ge:
-        jsr xt_less_than
+        jsr underflow_2
+w_ge:
+        jsr w_less_than
         lda 0,x
         eor #$ff
         sta 0,x
@@ -19,6 +23,7 @@ z_ge:
 ; ## RANDOM ( -- n ) "Return a non-zero random word"
 ; ## "random"  tested ad hoc
 xt_random:
+w_random:
         jsr rng_798
         dex
         dex
@@ -32,6 +37,8 @@ z_random:
 ; ## RANDINT( n -- k ) "Return random unsigned k in [0, n) without modulo bias"
 ; ## "randint"  tested ad hoc
 xt_randint:
+        jsr underflow_1
+w_randint:
         txa                 ; set up stack for initial division
         sec
         sbc #6
@@ -46,24 +53,24 @@ xt_randint:
         lda 6,x
         sta 0,x
         ; ( n {$ffff 0} n )
-        jsr xt_um_slash_mod         ; ( ud u -- rem quo )
+        jsr w_um_slash_mod         ; ( ud u -- rem quo )
         ; ( n rem quo )
 _retry:
-        jsr xt_nip
-        jsr xt_over
-        jsr xt_random
-        jsr xt_one_minus            ; random is non-zero, so -1
+        jsr w_nip
+        jsr w_over
+        jsr w_random
+        jsr w_one_minus            ; random is non-zero, so -1
         ; ( n quo n rand0 )
-        jsr xt_zero
-        jsr xt_rot
+        jsr w_zero
+        jsr w_rot
         ; ( n quo {rand0 0} n )
         ; use /mod to get the candidate remainder, but discard
         ; if the quotient rand0 // n == $ffff // n since not all
         ; potential results are equally represented at the tail end
-        jsr xt_um_slash_mod
+        jsr w_um_slash_mod
         ; ( n quo rem quo' )
-        jsr xt_rot
-        jsr xt_tuck
+        jsr w_rot
+        jsr w_tuck
         ; ( n rem quo quo' quo )
         inx                 ; 2drop and compare
         inx
@@ -93,6 +100,8 @@ z_randint:
 ; ## TOLOWER ( addr u -- addr u ) "convert ascii to lower case in place; uses tmp1"
 ; ## "tolower"  tested ad hoc
 xt_tolower:
+                jsr underflow_2
+w_tolower:
                 ; we'll work backwards, using addr in tmp1
                 lda 2,x         ; copy addr to tmp1
                 sta tmp1
@@ -131,6 +140,8 @@ z_tolower:      rts
 ; ## UNPACK ( u -- lo hi ) "unpack uint16 to lo and hi bytes"
 ; ## "unpack"  tested ad hoc
 xt_unpack:
+                jsr underflow_1
+w_unpack:
                 dex
                 dex
                 lda 3,x     ; get hi byte
@@ -144,6 +155,8 @@ z_unpack:       rts
 ; ## PACK ( lo hi  -- u ) "pack two char vals to uint16"
 ; ## "pack"  tested ad hoc
 xt_pack:
+                jsr underflow_2
+w_pack:
                 lda 0,x     ; pop hi byte
                 inx
                 inx
@@ -156,7 +169,7 @@ z_pack:         rts
 ; ## "cs@"
 xt_cs_fetch:
                 jsr underflow_1
-
+w_cs_fetch:
                 ldy #0      ; assume msb is zero
                 lda (0,x)
                 sta 0,x
@@ -170,6 +183,8 @@ z_cs_fetch:     rts
 ; ## ASCIIZ> ( c-addr -- addr u ) "count a zero-terminated string; uses tmp1"
 ; ## "asciiz"  tested ad hoc
 xt_asciiz:
+        jsr underflow_1
+w_asciiz:
         lda 0,x
         sta tmp1
         lda 1,x
@@ -202,51 +217,71 @@ z_asciiz:
 
 .include "sd.asm"
 
-xt_block_sd_init:
+xt_block_sd_init:       ; ( -- true | false )
 w_block_sd_init:
         ; low level SD card init
-        dex
-        dex
         phx
 
         jsr sd_init             ; try to init SD card
-set_sd_status:
-        bne +
-        tax                     ; A=X=0 on success
+        beq +                   ; returns A=0 on success, with Z flag
+        lda #$ff
 +
-        phx
-        ply
         plx
+        ora #$ff                ; invert so we have true on success, false on failure
+
+        dex                     ; return status
+        dex
         sta 0,x
-        sty 1,x
+        sta 1,x
+
+        dex                     ; set block read vector
+        dex
+        lda #<sd_blk_read
+        sta 0,x
+        lda #>sd_blk_read
+        sta 1,x
+        jsr w_block_read_vector
+        jsr w_store
+
+        ;TODO write vector not supported yet
+
 z_block_sd_init:
         rts
 
-xt_sd_blk_read:
-    ; sd-blk-read ( udblk buf -- status )
-    ; read the 512-byte with 32-bit index sd_blk to sd_bufp
-        lda 0,x
+
+sd_blk_read:    ; ( addr u -- )
+    ; read a 1024-byte block with 16-bit index to addr.  This corresponds to
+    ; two sequential 512 SD blocks.  This only addresses a small subset
+    ; of the addressable SD space.
+
+        lda 2,x
         sta sd_bufp
-        lda 1,x
+        lda 3,x
         sta sd_bufp+1
 
-        lda 2,x                 ; udblk is stored in NUXI order on the stack
-        sta sd_blk+2            ; but we need XINU (litte endian) in sd_blk
-        lda 3,x
-        sta sd_blk+3
-        lda 4,x
+        stz sd_blk+2
+        stz sd_blk+3
+
+        lda 0,x
+        asl
         sta sd_blk
-        lda 5,x
+        lda 1,x
+        rol
         sta sd_blk+1
+        rol sd_blk+2
+
         inx
         inx
         inx
         inx
 
         phx
+        jsr sd_readblock        ; increments sd_blk and sd_bufp
+        bne _done
         jsr sd_readblock
-        jmp set_sd_status
-z_sd_blk_read:
+_done:
+        plx
+        rts
 
 
 blk_loader = $400
@@ -258,11 +293,15 @@ blk_rw  .byte ?
 
 ; block-write-n ( addr blk n ) loop over block-write n times (n <= 64)
 xt_block_write_n:
+        jsr underflow_3
+w_block_write_n:
         ldy #1
         bra blk_rw_n
 
 ; block-read-n ( addr blk n ) loop over block-read n times (n <= 64)
 xt_block_read_n:
+        jsr underflow_3
+w_block_read_n:
         ldy #0
 blk_rw_n:
         sty blk_rw              ; 0=read, 1=write
@@ -301,15 +340,15 @@ z_block_read_n:
 z_block_write_n:
 
 
-xt_block_boot:
+xt_block_boot:      ; ( -- )
 .if ARCH == "sim"
-        jsr w_block_c65_init    ; return t/f status
+        jsr w_block_c65_init
 .else
         jsr w_block_sd_init
 .endif
 
-        dex
-        dex
+        inx                     ; pre-drop
+        inx
         lda $fe,x
         bne _chkfmt
 
@@ -319,7 +358,7 @@ _err:
         sta tmp3
         sty tmp3+1
         jsr print_common
-        jmp xt_cr
+        jmp w_cr
 
 _badblk:
         lda #<_ebadblk
@@ -332,14 +371,13 @@ _ebadblk:
         .shift "bad boot block"
 
 _chkfmt:
-
         dex
         dex
         lda #<blk_loader
         sta 0,x
         lda #>blk_loader
         sta 1,x
-        jsr xt_zero
+        jsr w_zero
         jsr w_block_read        ; <blk_loader> 0 block-read
 
         ; valid boot block looks like TF<length16><code...>
@@ -349,6 +387,7 @@ _chkfmt:
         lda blk_loader+1
         cmp #'F'
         bne _badblk
+
         dex
         dex
         dex
@@ -361,12 +400,11 @@ _chkfmt:
         sta 0,x
         lda blk_loader+3
         sta 1,x
-        jmp xt_evaluate
+        jmp w_evaluate
 z_block_boot:
 
 
 ; linkz decode 4 byte packed representation into 3 words
-; ( link-addr -- dest' verb cond' )
 ;
 ;           addr+3          addr+2             addr+1           addr+0
 ;    +-----------------+-----------------+-----------------+-----------------+
@@ -375,7 +413,9 @@ z_block_boot:
 ;    | . . .|  cf | dt |     dest        |     cobj     |          verb      |
 ;    +------+-----+----+-----------------+--------------+--+-----------------+
 ;             1,x   5,x      4,x               0,x       3,x       2,x
-xt_decode_link:
+xt_decode_link:     ; ( link-addr -- dest' verb cond' )
+        jsr underflow_1
+w_decode_link:
         lda 0,x         ; copy addr to tmp1
         sta tmp1
         lda 1,x
@@ -415,6 +455,8 @@ z_decode_link:
 ; ## typez ( strz digrams -- ) "emit a wrapped dizzy+woozy encoded string"
 ; ## "typez"  tested ad hoc
 xt_typez:
+        jsr underflow_2
+w_typez:
         lda (2,x)
         beq _empty              ; skip empty string to avoid a newline
 

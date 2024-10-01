@@ -131,16 +131,11 @@ kernel_init:
         sta txt_str+1
         jsr txt_puts
 
-;TODO
-.if ARCH = "sim"
         jmp xt_block_boot
-.else
-        rts
-.endif
+
 
 kernel_bye:
         brk
-
 
 
 kernel_getc:

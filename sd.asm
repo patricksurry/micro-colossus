@@ -221,6 +221,7 @@ sd_await:
 
 sd_readblock:
     ; read the 512-byte with 32-bit index sd_blk to sd_bufp
+    ; sd_bufp += $200, sd_blk += 1
     ; sd_blk is stored in little endian (XINU) order
 
         ; activate card
@@ -232,10 +233,12 @@ sd_readblock:
         jsr delay12             ; need 18 cycles before next write
 
         ldy #3                  ;2
+        sec                     ;2
 -
         lda sd_blk,y            ;4  send little endian block index in big endian order
         sta VIA_SR              ;4  A -> VIA SR -> SD
-        jsr delay12             ;12  (though 9 would be enough)
+        adc #0                  ;2  increment blk for next call
+        sta sd_blk,y            ;5
         dey                     ;2
         bpl -                   ;3/2
 
@@ -264,19 +267,18 @@ sd_readblock:
         ldy #0                  ; 2 cycles      byte counter
 -
         lda SD_DATA             ; 4 cycles
-        stx VIA_SR              ; 4 cycles      trigger next byte
+        stx VIA_SR              ; 4 cycles      trigger next byte (need 18+ cycles loop)
         sta (sd_bufp),y         ; 6 cycles
         cmp 0                   ; delay 3 cycles preserving V flag
         iny                     ; 2 cycles
         bne -                   ; 2(+1) cycles
+
         inc sd_bufp+1
         bvc _crc                ; second page?
         clv                     ; clear overflow for second page
         bra -
 
 _crc:
-        dec sd_bufp+1           ; restore buffer pointer
-
         ;TODO check crc-16
         lda SD_DATA             ; first byte of crc-16
         jsr sd_readbyte         ; second byte of crc-16
