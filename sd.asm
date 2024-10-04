@@ -31,6 +31,8 @@ Timing diagram (https://wavedrom.com/editor.html):
     }
 }
 
+Good interface intro http://www.rjhcoding.com/avrc-sd-interface-4.php
+
 See also http://forum.6502.org/viewtopic.php?t=1674
 
 Code adapted from https://github.com/gfoot/sdcard6502/blob/master/src/libsd.s
@@ -156,6 +158,136 @@ _fail:
         bra sd_exit
 
 
+sd_rwcmd:
+    ; send a read (17) or write (24) command
+    ; arg is block num, CRC not checked
+        ora #$40                ; set bit six of command
+        tay
+
+        ; activate card
+        lda #SD_CS
+        trb DVC_CTRL
+
+        sty VIA_SR              ; A -> VIA SR -> SD
+        jsr delay12             ; need 18 cycles before next write
+
+        ldx #3                  ;2
+-
+        lda sd_blk,x            ;4  send little endian block index in big endian order
+        sta VIA_SR              ;4  A -> VIA SR -> SD
+        jsr delay12             ;12  a little overkill for 18 total
+        dex                     ;2
+        bpl -                   ;3/2
+-
+        inx                     ; sd_blk++
+        inc sd_blk,x
+        beq -
+
+        ldx #$ee                ;TODO error code
+
+        lda #1                  ; send CRC 0 with termination bit
+        sta VIA_SR
+        jsr sd_await
+        cmp #0                  ; R1 response has leading 0 with 7 potential error bits
+        bne sd_exit             ; 0 -> success; else return error
+
+        rts
+
+
+sd_exit:
+        ; disable the card, returning status in A (0 = OK)
+        tay
+        lda #SD_CS
+        tsb DVC_CTRL
+        tya
+        rts
+
+
+sd_readblock:
+    ; read the 512-byte with 32-bit index sd_blk to sd_bufp
+    ; sd_bufp += $200, sd_blk += 1
+    ; sd_blk is stored in little endian (XINU) order
+        lda #17
+        jsr sd_rwcmd
+
+        ldx #$dd                ;TODO
+
+        jsr sd_await            ; wait for data start token #$fe
+        ina                     ; A=$fe on success, +2 => 0
+        ina
+        bne sd_exit
+
+        ; now read 512 bytes of data
+        ; unroll first loop step to interpose indexing stuff between write/write
+
+        ldx #$ff
+        bit sd_cmd0             ; set overflow as page 0 indicator (all cmd bytes have bit 6 set)
+        stx VIA_SR              ; 4 cycles      trigger first byte in
+        jsr delay12             ; 12 cycles
+        ldy #0                  ; 2 cycles      byte counter
+-
+        lda SD_DATA             ; 4 cycles
+        stx VIA_SR              ; 4 cycles      trigger next byte (need 18+ cycles loop)
+        sta (sd_bufp),y         ; 6 cycles
+        cmp 0                   ; delay 3 cycles preserving V flag
+        iny                     ; 2 cycles
+        bne -                   ; 2(+1) cycles
+
+        inc sd_bufp+1
+        bvc _crc                ; second page?
+        clv                     ; clear overflow for second page
+        bra -
+
+_crc:
+        ;TODO check crc-16
+        lda SD_DATA             ; first byte of crc-16
+        jsr sd_readbyte         ; second byte of crc-16
+
+        lda #0                  ; success
+        bra sd_exit
+
+
+sd_writeblock:
+    ; write the 512-byte with 32-bit index sd_blk to sd_bufp
+        lda #24
+        jsr sd_rwcmd
+
+        lda #$fe
+        sta SD_DATA             ;4  write data start token
+
+        ; now write 512 bytes of data
+
+        bit sd_cmd0             ;4  V=1 for page 0 (all cmd bytes have bit 6 set)
+        ldy #0                  ;2
+-
+        nop                     ;2
+        nop                     ;2
+        lda (sd_bufp),y         ;5
+        sta SD_DATA             ;4      write byte (need 18+ cycle loop)
+        iny                     ;2
+        bne -                   ;3/2
+
+        inc sd_bufp+1
+        bvc _check              ; second page?
+        clv                     ; clear overflow for second page
+        bra -
+
+_check:
+        ldx #$cc                ;TODO
+
+        jsr sd_await            ; data response is xxx0sss1
+        and #$1f                ; where x=don't care, sss is status
+        cmp #5                  ; 00101 means data accepted
+        bne sd_exit
+
+_busy:
+        jsr sd_await            ; ignore $0 which busy token
+        beq _busy
+
+        lda #0
+        bra sd_exit
+
+
 sd_readbyte:   ; () -> A; X,Y const
     ; trigger an SPI byte exchange and return the result
         lda #$ff                ; write a noop byte to exchange SR
@@ -205,95 +337,15 @@ sd_command:     ; (sd_cmdp) -> A; X const
         cpy #6                  ; 2 cycles
         bne -                   ; 2(+1) cycles
 
+        ; fall through
+
 sd_await:
+    ; wait for a response byte which is not all ones
         jsr sd_readbyte
         cmp #$ff
         beq sd_await
 
         rts
-
-sd_exit:
-        ; disable the card, returning status in A (0 = OK)
-        tay
-        lda #SD_CS
-        tsb DVC_CTRL
-        tya
-        rts
-
-sd_readblock:
-    ; read the 512-byte with 32-bit index sd_blk to sd_bufp
-    ; sd_bufp += $200, sd_blk += 1
-    ; sd_blk is stored in little endian (XINU) order
-
-        ; activate card
-        lda #SD_CS
-        trb DVC_CTRL
-
-        lda #(17 | $40)         ; command 17, arg is block num, crc not checked
-        sta VIA_SR              ; A -> VIA SR -> SD
-        jsr delay12             ; need 18 cycles before next write
-
-        ldx #3                  ;2
--
-        lda sd_blk,x            ;4  send little endian block index in big endian order
-        sta VIA_SR              ;4  A -> VIA SR -> SD
-        jsr delay12             ;12  a little overkill for 18 total
-        dex                     ;2
-        bpl -                   ;3/2
--
-        inx                     ; sd_blk++
-        inc sd_blk,x
-        beq -
-
-        ldx #$ee                ;TODO
-
-        lda #1                  ; send CRC 0 with termination bit
-        sta VIA_SR
-        jsr sd_await
-        cmp #0
-        bne sd_exit             ; 0 -> success; else return error
-
-        ldx #$dd                ;TODO
-
-        jsr sd_await            ; wait for data start token #
-        ina                     ; A=$fe on success, +2 => 0
-        ina
-        bne sd_exit
-
-        ; now read 512 bytes of data
-        ; unroll first loop step to interpose indexing stuff between write/write
-
-        ldx #$ff
-        bit sd_cmd0             ; set overflow as page 0 indicator (all cmd bytes have bit 6 set)
-        stx VIA_SR              ; 4 cycles      trigger first byte in
-        jsr delay12             ; 12 cycles
-        ldy #0                  ; 2 cycles      byte counter
--
-        lda SD_DATA             ; 4 cycles
-        stx VIA_SR              ; 4 cycles      trigger next byte (need 18+ cycles loop)
-        sta (sd_bufp),y         ; 6 cycles
-        cmp 0                   ; delay 3 cycles preserving V flag
-        iny                     ; 2 cycles
-        bne -                   ; 2(+1) cycles
-
-        inc sd_bufp+1
-        bvc _crc                ; second page?
-        clv                     ; clear overflow for second page
-        bra -
-
-_crc:
-        ;TODO check crc-16
-        lda SD_DATA             ; first byte of crc-16
-        jsr sd_readbyte         ; second byte of crc-16
-
-        lda #0                  ; success
-        bra sd_exit
-
-
-sd_writeblock:
-    ;TODO write the 512-byte with 32-bit index sd_blk to sd_bufp
-        lda #0
-        bra sd_exit
 
 
 ; see command descriptions at https://chlazza.nfshost.com/sdcardinfo.html

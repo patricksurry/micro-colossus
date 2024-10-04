@@ -103,5 +103,8 @@ via_init:    ; () -> nil const X, Y
         stz DVC_CTRL
         lda #$ff
         sta DVC_CDR
+        lda #%0111_1111
+        sta VIA_IER             ; disable all interrupts
+        sta VIA_IFR             ; clear interrupt flags
         rts
 

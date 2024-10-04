@@ -256,20 +256,28 @@ z_block_sd_init:
         rts
 
 
-sd_blk_read:    ; ( addr u -- )
-    ; read a 1024-byte block with 16-bit index to addr.  This corresponds to
-    ; two sequential 512 SD blocks.  This only addresses a small subset
-    ; of the addressable SD space.
+; SD implementations of the block-read|write hooks
+; note that forth block is 1kb, which is two raw SD blocks
+; so we double the 16 bit block index and read a pair of SD blocks
+; This only addresses a fraction of the full addressable SD space.
 
+sd_blk_write:    ; ( addr u -- )
+        bit z_block_sd_init     ; set V=1
+        bra sd_blk_rw
+
+sd_blk_read:    ; ( addr u -- )
+        clv                     ; set V=0
+
+sd_blk_rw:
         lda 2,x
         sta sd_bufp
         lda 3,x
         sta sd_bufp+1
 
-        stz sd_blk+2
+        stz sd_blk+2            ; hi bytes are usually
         stz sd_blk+3
 
-        lda 0,x
+        lda 0,x                 ; double the index
         asl
         sta sd_blk
         lda 1,x
@@ -277,27 +285,95 @@ sd_blk_read:    ; ( addr u -- )
         sta sd_blk+1
         rol sd_blk+2
 
-        inx
+        inx                     ; 2drop leaving ( )
         inx
         inx
         inx
 
-        phx
+        phx                     ; save forth data stack pointer
+        bvc _read
+
+        jsr sd_writeblock
+        bne _done
+        jsr sd_writeblock
+        bra _done
+
+_read:
         jsr sd_readblock        ; increments sd_blk and sd_bufp
         bne _done
         jsr sd_readblock
+
 _done:
         plx
         rts
 
 
-sd_blk_write:    ; ( addr u -- )
-    ; write 1024 bytes from addr to 16-bit block, corresponding to two 512 byte SD blocks.
+; low level words to read and write n 512 byte SD blocks using a 32 bit index
+; note these routines return 0 on success or a non-zero error status
+
+xt_sd_raw_write:   ; ( addr ud n -- 0|err )
+        jsr underflow_4
+w_sd_raw_write:
+        ldy #1
+        bra sd_raw_rw
+
+xt_sd_raw_read:    ; ( addr ud n -- 0|err )
+        jsr underflow_4
+w_sd_raw_read:
+        ldy #0
+
+sd_raw_rw:
+        sty blk_rw              ; remember read or write
+        lda 6,x
+        sta sd_bufp
+        lda 7,x
+        sta sd_bufp+1
+
+        lda 2,x                 ; convert forth NUXI double to XINU order
+        sta sd_blk+2
+        lda 3,x
+        sta sd_blk+3
+        lda 4,x
+        sta sd_blk+0
+        lda 5,x
+        sta sd_blk+1
+
+        lda 0,x                 ; grab number of blocks to read/write
+        sta blk_n               ; ignore MSB since 128 blocks is already 64Kb
+
+        inx                     ; leave ( addr ) where we'll store status
         inx
         inx
         inx
         inx
-        ; TODO ... sd_writeblock ...
+        inx
+
+-
+        lda blk_rw
+        beq _read
+        jsr sd_writeblock       ; low level routines inc bufp and block index
+        bra +
+_read:
+        jsr sd_readblock
++
+        bne _done
+        dec blk_n
+        bne -
+
+_done:
+        cmp #0                  ; success?
+        bne +
+        tax                     ; set X=A=0 on success
++
+        phx
+        ply                     ; txy
+        plx                     ; restore forth data stack pointer
+
+        sty 0,x
+        sta 1,x
+
+z_sd_raw_read:
+z_sd_raw_write:
         rts
 
 

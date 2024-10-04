@@ -14,10 +14,10 @@ kb_init:    ; () -> nil const X, Y
     ; no keys yet
         stz kb_key7
         stz kb_key8
-    ; set up handshake mode and interrupt on data ready (CA1 rising edge)
+    ; set up handshake mode and interrupt on data ready (CA1 falling edge)
         lda VIA_PCR
         and #(255-VIA_HS_CA1_MASK)
-        ora #VIA_HS_CA1_RISE
+        ora #VIA_HS_CA1_FALL
         sta VIA_PCR
         lda #(VIA_IER_SET | VIA_INT_CA1)
         sta VIA_IER

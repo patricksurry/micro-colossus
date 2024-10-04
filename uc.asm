@@ -106,11 +106,11 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 
 kernel_init:
     ; Custom initialization called as turnkey during forth startup
+        jsr via_init
         jsr kb_init             ; set up KB shift register to trigger interrupt
         jsr lcd_init
         jsr txt_init
         jsr util_init
-        jsr via_init
 
 .if ARCH != "sim"
         lda #<spk_morse
