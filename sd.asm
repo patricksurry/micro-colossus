@@ -73,8 +73,12 @@ sd_blk:     ; four byte block index (little endian)
 SD_CD = %0001_0000
 SD_CS = %0010_0000
 
-SD_DATA = DVC_DATA | VIA_DVC_SD
+; we write to the VIA_SR with SD_CS low to shift a byte out to the SD
+; this triggers an exchange where the SD writes a byte to the external SR
+; which we can then read by selecting that device and reading port A
 
+SD_RECV = DVC_DATA | VIA_DVC_SD
+SD_SEND = VIA_SR
 
 sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
   ; Let the SD card boot up, by pumping the clock with SD CS disabled
@@ -96,7 +100,7 @@ sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
 
         ; clock 20 x 8 hi-bits out without chip enable (CS hi)
 -
-        sta VIA_SR              ; 4 cycles
+        sta SD_SEND             ; 4 cycles
         jsr delay12             ; need 18+ cycles to shift out 8 bits
         dex                     ; 2 cycles
         bne -                   ; 2(+1) cycles
@@ -168,13 +172,13 @@ sd_rwcmd:
         lda #SD_CS
         trb DVC_CTRL
 
-        sty VIA_SR              ; A -> VIA SR -> SD
+        sty SD_SEND             ; A -> VIA SR -> SD
         jsr delay12             ; need 18 cycles before next write
 
         ldx #3                  ;2
 -
         lda sd_blk,x            ;4  send little endian block index in big endian order
-        sta VIA_SR              ;4  A -> VIA SR -> SD
+        sta SD_SEND             ;4  A -> VIA SR -> SD
         jsr delay12             ;12  a little overkill for 18 total
         dex                     ;2
         bpl -                   ;3/2
@@ -186,7 +190,7 @@ sd_rwcmd:
         ldx #$ee                ;TODO error code
 
         lda #1                  ; send CRC 0 with termination bit
-        sta VIA_SR
+        sta SD_SEND
         jsr sd_await
         cmp #0                  ; R1 response has leading 0 with 7 potential error bits
         bne sd_exit             ; 0 -> success; else return error
@@ -222,12 +226,12 @@ sd_readblock:
 
         ldx #$ff
         bit sd_cmd0             ; set overflow as page 0 indicator (all cmd bytes have bit 6 set)
-        stx VIA_SR              ; 4 cycles      trigger first byte in
+        stx SD_SEND             ; 4 cycles      trigger first byte in
         jsr delay12             ; 12 cycles
         ldy #0                  ; 2 cycles      byte counter
 -
-        lda SD_DATA             ; 4 cycles
-        stx VIA_SR              ; 4 cycles      trigger next byte (need 18+ cycles loop)
+        lda SD_RECV             ; 4 cycles
+        stx SD_SEND             ; 4 cycles      trigger next exchange (need 18+ cycles loop)
         sta (sd_bufp),y         ; 6 cycles
         cmp 0                   ; delay 3 cycles preserving V flag
         iny                     ; 2 cycles
@@ -240,7 +244,7 @@ sd_readblock:
 
 _crc:
         ;TODO check crc-16
-        lda SD_DATA             ; first byte of crc-16
+        lda SD_RECV             ; first byte of crc-16
         jsr sd_readbyte         ; second byte of crc-16
 
         lda #0                  ; success
@@ -253,17 +257,17 @@ sd_writeblock:
         jsr sd_rwcmd
 
         lda #$fe
-        sta SD_DATA             ;4  write data start token
+        sta SD_SEND             ;4  write data start token
 
         ; now write 512 bytes of data
 
-        bit sd_cmd0             ;4  V=1 for page 0 (all cmd bytes have bit 6 set)
+        bit sd_cmd0             ;4  set V=1 for page 0 (all cmd bytes have bit 6 set)
         ldy #0                  ;2
 -
         nop                     ;2
         nop                     ;2
         lda (sd_bufp),y         ;5
-        sta SD_DATA             ;4      write byte (need 18+ cycle loop)
+        sta SD_SEND             ;4  write byte (need 18+ cycle loop)
         iny                     ;2
         bne -                   ;3/2
 
@@ -275,13 +279,13 @@ sd_writeblock:
 _check:
         ldx #$cc                ;TODO
 
-        jsr sd_await            ; data response is xxx0sss1
-        and #$1f                ; where x=don't care, sss is status
-        cmp #5                  ; 00101 means data accepted
+        jsr sd_await            ; data response is xxx0sss1 where x is don't care
+        and #$1f                ; and sss is status (010 ok, 101 CRC err, 110 write err)
+        cmp #5                  ; so 0sss1 == 00101 means data was accepted
         bne sd_exit
 
 _busy:
-        jsr sd_await            ; ignore $0 which busy token
+        jsr sd_await            ; ignore $0 which is the busy token
         beq _busy
 
         lda #0
@@ -291,10 +295,10 @@ _busy:
 sd_readbyte:   ; () -> A; X,Y const
     ; trigger an SPI byte exchange and return the result
         lda #$ff                ; write a noop byte to exchange SR
-        sta VIA_SR              ; A -> VIA SR -> SD triggers SD -> ext SR; then lda SD_DATA
+        sta SD_SEND             ; A -> VIA SR -> SD triggers SD -> ext SR; then lda SD_RECV
         jsr delay12             ; 12 cycles
-        nop                     ; 2 cycles giving 14 between SR out -> start of lda SD_DATA
-        lda SD_DATA             ; 4 cycles
+        nop                     ; 2 cycles giving 14 between SR out -> start of receive
+        lda SD_RECV             ; 4 cycles
         rts                     ; 6 cycles
 
 
@@ -331,7 +335,7 @@ sd_command:     ; (sd_cmdp) -> A; X const
         ldy #0
 -
         lda (sd_cmdp),y         ; 5 cycles
-        sta VIA_SR              ; 4 cycles
+        sta SD_SEND             ; 4 cycles
         cmp #0                  ; delay 2 cycles
         iny                     ; 2 cycles
         cpy #6                  ; 2 cycles

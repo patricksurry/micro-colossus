@@ -348,6 +348,7 @@ sd_raw_rw:
         inx
         inx
 
+        phx                     ; save Forth stack pointer
 -
         lda blk_rw
         beq _read
