@@ -97,12 +97,22 @@ VIA_HS_CB2_LOW   = %1100_0000
 VIA_HS_CB2_HIGH  = %1110_0000
 
 
+; hardware setup for PortB
+; SD uses PB4 for chip detect (ipins on PB4 and 5
+
+; PB0..3 are unused
+SD_CD   = %0001_0000  ; in (card present)
+SD_CS   = %0010_0000  ; out, normally high (/CS)
+TTY_CS  = %0100_0000  ; out, normally high (/CS)
+SPK_OUT = %1000_0000  ; out, normally low  (no tone)
 
 via_init:    ; () -> nil const X, Y
-        ; all dev control bits are outputs, initially 0
-        stz DVC_CTRL
-        lda #$ff
-        sta DVC_CDR
+        ; /CS should be initially high, others low
+        lda # SD_CS | TTY_CS
+        sta DVC_CTRL
+        lda # SD_CS | TTY_CS | SPK_OUT
+        sta DVC_CDR             ; designate three output pins
+
         lda #%0111_1111
         sta VIA_IER             ; disable all interrupts
         sta VIA_IFR             ; clear interrupt flags

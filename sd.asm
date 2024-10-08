@@ -69,10 +69,6 @@ sd_blk:     ; four byte block index (little endian)
 
 ; TODO use SD_CD to check if SD card present
 
-; hardware setup pins on PB4 and 5
-SD_CD = %0001_0000
-SD_CS = %0010_0000
-
 ; we write to the VIA_SR with SD_CS low to shift a byte out to the SD
 ; this triggers an exchange where the SD writes a byte to the external SR
 ; which we can then read by selecting that device and reading port A
