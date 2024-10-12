@@ -15,23 +15,11 @@ VIA_IER     = address(VIA + $e) ; write bit 7 hi + bits to set, or bit 7 lo + bi
 VIA_IORA_   = address(VIA + $f)
 
 
-; VIA is mapped at $c0xy where y = $0-f selects the VIA register
-; and x = $0-f selects the device to enable (typically to read/write on port A)
-; currently the upper two bits of x are ignored and the lower
-; Normally we can do all the control pin setup etc without enabling the
-; device, and then do the actual read/write through the device-enabled address
-
-VIA_DVC_NIL = %00_0000  ; no device enabled
-;             %01_0000  ; unused
-VIA_DVC_KBD = %10_0000  ; keyboard enabled
-VIA_DVC_SD  = %11_0000  ; SD card enabled
-
 DVC_CTRL    = VIA_IORB
 DVC_CDR     = VIA_DDRB
 
 DVC_DATA    = VIA_IORA  ; read/write with VIA_DVC_xxx to enable device
 DVC_DDR     = VIA_DDRA
-
 
 ; VIA_ACR flag values
 
@@ -96,6 +84,20 @@ VIA_HS_CB2_PULS  = %1010_0000
 VIA_HS_CB2_LOW   = %1100_0000
 VIA_HS_CB2_HIGH  = %1110_0000
 
+
+; IO is mapped at $c0xy where x selects a device and y selects a register
+;
+; xy = 0... ..rd  selects the LCD with r=1/0 for r/w d=1/0 for data/ctrl
+; xy = 1.ss rrrr  selects VIA register rrrr ($0-f) while enabling device ss
+;
+; Typically we do control pin setup on port B without enabling the
+; device, and then do a read/write with a device-enabled address
+; We read external VIA devices through port A.
+
+VIA_DVC_NIL = %00_0000  ; no device enabled
+;             %01_0000  ; unused
+VIA_DVC_KBD = %10_0000  ; keyboard input SR enabled
+VIA_DVC_SPI = %11_0000  ; SPI input SR enabled
 
 ; hardware setup for PortB
 ; SD uses PB4 for chip detect (ipins on PB4 and 5

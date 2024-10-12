@@ -12,6 +12,8 @@ spk_delay16:    .word ?         ; the two byte delay() constant for one sixteent
 spk_tone:   ; (A) -> nil
     ; start playing midi note number in A (A=69 for A4 @ 440Hz; A=0 for C(-2))
         ldy #0                  ; rewrite A as Y * 12 + (A % 12)
+;TODO for 4x clock, start y at -2
+        ldy #$fe
 _noct:  cmp #12                 ; Y = A // 12 (octave shifts)
         bmi _found
         sec
@@ -83,7 +85,7 @@ _rest:  ldy #1
         tax
 _more:  ldy spk_delay16
         lda spk_delay16+1
-        jsr delay
+        jsr sleep
         dex
         bne _more
         jsr spk_off
@@ -140,7 +142,7 @@ twinkle:
 
 .comment
 The frequency of the i-th key on a 88 key piano, with i=69 corresponding to A4 @ 440Hz,
-is equal to 440 * pow(2, (i-69)/12).  At a clock frequency F=1MHz we see
+is equal to 440 * pow(2, (i-69)/12).  At a clock frequency F=1MHz we have
 N = F/freq = 1e6/(440 * pow(2, i-69/12)) cycles per period.
 The VIA timer needs to invert twice, so the duty cycle is half of that.
 Here's some python code to calculate the frequencies for the lowest octave (with the longest duty cycle)
@@ -158,6 +160,7 @@ for i in range(0, 12):
     print(f".byte ${duty & 0xff:02x}, ${duty >> 8:02x}   ; {note:3s}{octave} {freq:.1f}Hz  N={duty}")
 .endcomment
 
+; 1MHz
 spk_octave:                     ; note octave freq duty
         .byte $e4               ; C     -2  8.2Hz  N=61156     midi note 0 is C(-2) @ 8.1758 Hz
         .byte $7c               ; C# Db -2  8.7Hz  N=57724

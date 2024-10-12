@@ -5,14 +5,16 @@
         .enc "none"
 
 .weak
-ARCH            = "sim"         ; or bb1 or bb2
+ARCH            = "sim"         ; sim | term | bb1 | bb2
 TESTS           = 0             ; enable tests?
 .endweak
 
 ; For our minimal build, we'll drop all the optional words
 
-.if ARCH == "sim"
+.if ARCH == "sim" || ARCH == "term"
 TALI_ARCH := "c65"
+.else
+TALI_ARCH := "bb"
 .endif
 TALI_OPTIONAL_WORDS := [ "block" ]      ; [ "disassembler" ]
 TALI_OPTION_CR_EOL := [ "lf" ]
@@ -52,7 +54,7 @@ IOBASE    = address($c000)
 ; Bits R0-3 select VIA register or LCD C/D (R0)
 
 
-.if ARCH == "sim"
+.if TALI_ARCH == "c65"
 
         * = $ff00               ; use top memory to avoid stomping IO page
 
@@ -89,11 +91,16 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 
 .include "../tali/taliforth.asm"
 
+.include "util.asm"
 .include "via.asm"
 .include "speaker.asm"
 .include "lcd6963.asm"
 .include "kb.asm"
-.include "util.asm"
+
+.include "spi.asm"
+.include "sd.asm"
+.include "tty.asm"
+
 .include "morse.asm"
 .include "txt.asm"
 .include "words.asm"
@@ -112,7 +119,14 @@ kernel_init:
         jsr txt_init
         jsr util_init
 
-.if ARCH != "sim"
+        ; Setup complete, show kernel string and return to forth
+        lda #<s_kernel_id
+        sta txt_str
+        lda #>s_kernel_id
+        sta txt_str+1
+        jsr txt_puts
+
+.if TALI_ARCH == "bb"
         lda #<spk_morse
         sta morse_emit
         lda #>spk_morse
@@ -123,16 +137,9 @@ kernel_init:
         lda #'S'
         jsr morse_send
 .endif
-
-        ; Setup complete, show kernel string and return to forth
-        lda #<s_kernel_id
-        sta txt_str
-        lda #>s_kernel_id
-        sta txt_str+1
-        jsr txt_puts
         rts
-;TODO
-        jmp xt_block_boot
+
+;TODO   jmp xt_block_boot
 
 
 kernel_bye:
@@ -143,7 +150,7 @@ kernel_getc:
         phy
         jsr txt_show_cursor
 ;TODO in a non-blocking version we should inc rand16 l/h (skip 0)
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         jsr kb_getc             ; preserves X and Y
 .else
 -
@@ -165,8 +172,16 @@ kernel_putc:
 
 
 s_kernel_id:
-        .text "uC adventure (" .. ARCH .. " " .. GITSHA .. ")", AscLF, 0
-
+        .byte AscLF
+        .text "           __ ____         ___  ____", AscLF
+        .text "          / /|  __)       / _ \(___ \", AscLF
+        .text "   _   _ / /_| |__   ____| | | | __) )", AscLF
+        .text "  | | | | '_ \___ \ / ___) | | |/ __/", AscLF
+        .text "  | |_| | (_) )__) | (___| |_| | |___", AscLF
+        .text "  | ._,_|\___(____/ \____)\___/|_____)", AscLF
+        .text "  | |   `", AscLF
+        .text "  |_|  TaliForth2 " .. IDENT, AscLF
+        .byte AscLF, 0
 
 ; =====================================================================
 ; System vectors
@@ -176,7 +191,7 @@ s_kernel_id:
         .word kernel_init       ; turnkey vector
         .word forth             ; nmi
         .word forth             ; reset
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         .word kb_isr            ; irq/brk
 .else
         .word forth

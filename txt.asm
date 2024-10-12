@@ -1,5 +1,10 @@
-TXT_WIDTH       = LCD_COLS            ; screen width, < 256
+.if ARCH != "term"
+TXT_WIDTH       = LCD_COLS      ; screen width, < 256
 TXT_HEIGHT      = LCD_ROWS
+.else
+TXT_WIDTH       = 80            ; screen width, < 256
+TXT_HEIGHT      = 24
+.endif
 
 TXT_BUFFER      = ram_end+1
 
@@ -45,7 +50,7 @@ cb_tail     .word ?, ?
 cb_src: .word txt_noop
         .word txt_undizzy       ; undizzy fills buffer 1
 
-cb_snk: .word wrp_putc          ; buffer 0 feeds to ouput
+cb_snk: .word wrp_putc          ; buffer 0 feeds to output
         .word txt_noop
 
 
@@ -72,10 +77,11 @@ txt_init:
 
 txt_putc:   ; (A) -> nil const X
     ; put printable chr A (stomped) at the current position, handle bksp, tab, CR, LF
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         cmp #AscBS
         beq _bksp
 .endif
+.if ARCH != "term"
         ldy txt_y               ; do we need to scroll before new character?
         cpy #TXT_HEIGHT
         bmi +
@@ -110,8 +116,12 @@ _putc:
         sta io_putc
 .endif
 +
+.else
+        sta io_putc
+.endif
         rts
 
+.if ARCH != "term"
         ; go back, write a space, go back again
 _bksp:  pha                     ; save nozero chr as flag
 _back:  dec txt_x
@@ -151,6 +161,7 @@ _fill:  lda #' '                ; fill until txt_x zeros all bits in mask
         bpl txt_scrollup
 
 _done:  rts
+.endif
 
 
 txt_puts:
@@ -165,6 +176,7 @@ txt_puts:
         rts
 
 
+.if ARCH != "term"
 txt_scrollup:
         ; not safe to use Forth words that change tmps since this might be called any time
 
@@ -278,6 +290,15 @@ txt_show_cursor:
 txt_hide_cursor:
         jmp lcd_hide_cursor
 
+.else
+
+txt_cls:
+txt_show_cursor:
+txt_hide_cursor:
+        rts
+
+.endif
+
 ; Simple circular buffer implementation, with optional src/snk handlers
 
 ; puts a character into a circular buffer, updating head
@@ -323,8 +344,8 @@ wrp_new_line:
         sta wrp_flg         ; set flg to -1 (skip leading ws)
         rts
 
-
 wrp_putc:   ; buffer output via cb0 to kernel_putc
+.if ARCH != "term"
         ; enter with latest character in A which is also buffered
         ; so will eventually be retrieved via cb0_get
         ; the goal here is to track potential line and page breaks
@@ -338,6 +359,7 @@ wrp_putc:   ; buffer output via cb0 to kernel_putc
         bne _chkws
 
 _force: lda wrp_len             ; wrap at this col
+        sta wrp_col
         bra _putln
 
 _chkws: sec
@@ -354,7 +376,7 @@ _chkws: sec
         sta wrp_col
 
 _cont:  lda wrp_len
-        cmp #TXT_WIDTH-1        ; end of line?
+        cmp #TXT_WIDTH          ; end of line?
         beq _flush
 
         inc wrp_len             ; otherwise just advance col and wait for next chr
@@ -381,13 +403,16 @@ _out:   jsr cb0_get             ; consume wrp_col+1 chars
         jsr kernel_putc
         bra _out
 
-_last:  cmp #' '+1              ; last character is whitespace ?
-        bmi _nl
-
-        jsr kernel_putc         ; else emit the non-ws character first
-_nl:    lda #AscLF              ; either way add a NL
-        jsr kernel_putc
-
+_last:
+        cmp #' '+1              ; for hard break at end of line, we don't need NL
+        bpl +
+        lda wrp_col
+        cmp #TXT_WIDTH
+        beq _eol                ; eat soft break at TXT_WIDTH
+        lda #AscLF              ; otherwise add NL
++
+        jsr kernel_putc         ; non-ws character is at EOL so no NL needed
+_eol:
         dec wrp_row             ; count the row
         beq _page
 
@@ -396,6 +421,17 @@ _nl:    lda #AscLF              ; either way add a NL
 _page:
         jsr wrp_new_page        ; reset page wrap
         jmp kernel_getc         ; wait for a key press
+.else
+        pha
+        jsr cb0_get
+        jsr kernel_putc
+        pla
+        bne +
+        lda #AscLF
+        jsr kernel_putc
++
+        rts
+.endif
 
 
 txt_typez:   ;  (txt_strz, txt_digrams via buf1) -> buf0

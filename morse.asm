@@ -24,14 +24,15 @@ wait:   jsr morse_delay
 
 
 morse_delay:    ; (Y) -> nil const X
-    ; delay for about Y * 100ms where <= 6
-        lda #42
+    ; delay for about Y * 100ms where 0 < Y <= 6
+    ; 10*39*256 ~ 100K cycles is about 100ms at 1MHz
+        lda #0
         clc
-_more:  dey
-        beq _done
-        adc #42                 ; A = 42*Y
-        bra _more
-_done:  jmp delay
+-
+        adc #39                 ; A = 39 * Y
+        dey
+        bne -
+_done:  jmp sleep               ; sleep for 39*Y*256*10*grain cycles
 
 
 morse_send: ; (A) -> nil

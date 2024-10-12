@@ -1,3 +1,7 @@
+;----------------------------------------------------------------------
+; general helper words
+;----------------------------------------------------------------------
+
 xt_le:
         jsr underflow_2
 w_le:
@@ -97,46 +101,6 @@ z_randint:
         rts
 
 
-; ## TOLOWER ( addr u -- addr u ) "convert ascii to lower case in place; uses tmp1"
-; ## "tolower"  tested ad hoc
-xt_tolower:
-                jsr underflow_2
-w_tolower:
-                ; we'll work backwards, using addr in tmp1
-                lda 2,x         ; copy addr to tmp1
-                sta tmp1
-                lda 1,x         ; stash # of pages
-                pha
-                clc
-                adc 3,x         ; and add to addr
-                sta tmp1+1
-
-                lda 0,x         ; get starting offset
-                tay
-
-_tolower_loop:  dey
-                cpy #$ff        ; wrapped?
-                bne +
-                lda 1,x
-                beq _tolower_done
-                dec 1,x         ; next page
-                dec tmp1+1
-+
-                lda (tmp1),y
-                cmp #'A'
-                bmi _tolower_loop
-                cmp #'Z'+1
-                bpl _tolower_loop
-                ora #$20        ; lower case
-                sta (tmp1),y
-                bra _tolower_loop
-
-_tolower_done:  pla
-                sta 1,x
-
-z_tolower:      rts
-
-
 ; ## UNPACK ( u -- lo hi ) "unpack uint16 to lo and hi bytes"
 ; ## "unpack"  tested ad hoc
 xt_unpack:
@@ -180,6 +144,56 @@ _plus:          tya
 z_cs_fetch:     rts
 
 
+xt_cls:
+w_cls:
+                jsr txt_cls
+z_cls:
+                rts
+
+;----------------------------------------------------------------------
+; string helpers
+;----------------------------------------------------------------------
+
+; ## TOLOWER ( addr u -- addr u ) "convert ascii to lower case in place; uses tmp1"
+; ## "tolower"  tested ad hoc
+xt_tolower:
+                jsr underflow_2
+w_tolower:
+                ; we'll work backwards, using addr in tmp1
+                lda 2,x         ; copy addr to tmp1
+                sta tmp1
+                lda 1,x         ; stash # of pages
+                pha
+                clc
+                adc 3,x         ; and add to addr
+                sta tmp1+1
+
+                lda 0,x         ; get starting offset
+                tay
+
+_tolower_loop:  dey
+                cpy #$ff        ; wrapped?
+                bne +
+                lda 1,x
+                beq _tolower_done
+                dec 1,x         ; next page
+                dec tmp1+1
++
+                lda (tmp1),y
+                cmp #'A'
+                bmi _tolower_loop
+                cmp #'Z'+1
+                bpl _tolower_loop
+                ora #$20        ; lower case
+                sta (tmp1),y
+                bra _tolower_loop
+
+_tolower_done:  pla
+                sta 1,x
+
+z_tolower:      rts
+
+
 ; ## ASCIIZ> ( c-addr -- addr u ) "count a zero-terminated string; uses tmp1"
 ; ## "asciiz"  tested ad hoc
 xt_asciiz:
@@ -215,7 +229,217 @@ z_asciiz:
         rts
 
 
-.include "sd.asm"
+;----------------------------------------------------------------------
+; adventure-specific words
+;----------------------------------------------------------------------
+
+; ## typez ( strz digrams -- ) "emit a wrapped dizzy+woozy encoded string"
+; ## "typez"  tested ad hoc
+xt_typez:
+        jsr underflow_2
+w_typez:
+        lda (2,x)
+        beq _empty              ; skip empty string to avoid a newline
+
+        lda 0,x
+        sta txt_digrams
+        lda 1,x
+        sta txt_digrams+1
+
+        lda 2,x
+        sta txt_strz
+        lda 3,x
+        sta txt_strz+1
+
+        phx
+        jsr txt_typez           ; print encoded string plus trailing newline
+        plx
+
+_empty:
+        inx
+        inx
+        inx
+        inx
+
+z_typez:
+        rts
+
+
+; linkz decode 4 byte packed representation into 3 words
+;
+;           addr+3          addr+2             addr+1           addr+0
+;    +-----------------+-----------------+-----------------+-----------------+
+;    | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 |
+;    +------+-----+----+-----------------+--------------+--+-----------------+
+;    | . . .|  cf | dt |     dest        |     cobj     |          verb      |
+;    +------+-----+----+-----------------+--------------+--+-----------------+
+;             1,x   5,x      4,x               0,x       3,x       2,x
+xt_decode_link:     ; ( link-addr -- dest' verb cond' )
+        jsr underflow_1
+w_decode_link:
+        lda 0,x         ; copy addr to tmp1
+        sta tmp1
+        lda 1,x
+        sta tmp1+1
+
+        dex             ; make space for cond' @ 0-1, verb @ 2-3, dest at 4-5
+        dex
+        dex
+        dex
+
+        ldy #0
+        lda (tmp1),y
+        sta 2,x         ; verb lo
+        iny
+        lda (tmp1),y
+        lsr
+        sta 0,x         ; cond lo
+        lda #0
+        rol
+        sta 3,x         ; verb hi
+        iny
+        lda (tmp1),y
+        sta 4,x         ; dest lo
+        iny
+        lda (tmp1),y
+        tay
+        and #3
+        sta 5,x         ; dest hi
+        tya
+        lsr
+        lsr
+        sta 1,x         ; cond hi
+z_decode_link:
+        rts
+
+
+;----------------------------------------------------------------------
+; block extensions
+;----------------------------------------------------------------------
+
+blk_loader = $400
+
+.section zp
+blk_n   .byte ?
+blk_rw  .byte ?
+.endsection
+
+; block-write-n ( addr blk n ) loop over block-write n times (n <= 64)
+xt_block_write_n:
+        jsr underflow_3
+w_block_write_n:
+        ldy #1
+        bra blk_rw_n
+
+; block-read-n ( addr blk n ) loop over block-read n times (n <= 64)
+xt_block_read_n:
+        jsr underflow_3
+w_block_read_n:
+        ldy #0
+blk_rw_n:
+        sty blk_rw              ; 0=read, 1=write
+
+        lda 0,x
+        sta blk_n               ; block count (unsigned byte)
+        inx                     ; remove n from stack
+        inx
+        cmp #0                  ; any blocks to read?
+        beq _cleanup
+
+_loop:
+        jsr w_two_dup           ; ( addr blk addr blk )
+        ldy blk_rw
+        beq _rd
+        jsr w_block_write
+        bra +
+_rd:
+        jsr w_block_read
++
+        lda #4                  ; addr += 1024 = $400
+        clc
+        adc 3,x
+        sta 3,x
+
+        inc 0,x                 ; blk += 1
+        bne +
+        inc 1,x
++
+        dec blk_n               ; n--
+        bne _loop
+
+_cleanup:
+        jmp w_two_drop
+z_block_read_n:
+z_block_write_n:
+
+
+xt_block_boot:      ; ( -- )
+.if TALI_ARCH == "c65"
+        jsr w_block_c65_init
+.else
+        jsr w_block_sd_init
+.endif
+
+        inx                     ; pre-drop
+        inx
+        lda $fe,x
+        bne _chkfmt
+
+        lda #<_enoblk
+        ldy #>_enoblk
+_err:
+        sta tmp3
+        sty tmp3+1
+        jsr print_common
+        jmp w_cr
+
+_badblk:
+        lda #<_ebadblk
+        ldy #>_ebadblk
+        bra _err
+
+_enoblk:
+        .shift "block init failed"
+_ebadblk:
+        .shift "bad boot block"
+
+_chkfmt:
+        dex
+        dex
+        lda #<blk_loader
+        sta 0,x
+        lda #>blk_loader
+        sta 1,x
+        jsr w_zero
+        jsr w_block_read        ; <blk_loader> 0 block-read
+
+        ; valid boot block looks like TF<length16><code...>
+        lda blk_loader
+        cmp #'T'
+        bne _badblk
+        lda blk_loader+1
+        cmp #'F'
+        bne _badblk
+
+        dex
+        dex
+        dex
+        dex
+        lda #<blk_loader+4
+        sta 2,x
+        lda #>blk_loader+4
+        sta 3,x
+        lda blk_loader+2
+        sta 0,x
+        lda blk_loader+3
+        sta 1,x
+        jmp w_evaluate
+z_block_boot:
+
+
+;----------------------------------------------------------------------
+; SD card words
+;----------------------------------------------------------------------
 
 xt_block_sd_init:       ; ( -- true | false )
 w_block_sd_init:
@@ -378,201 +602,6 @@ z_sd_raw_write:
         rts
 
 
-blk_loader = $400
-
-.section zp
-blk_n   .byte ?
-blk_rw  .byte ?
-.endsection
-
-; block-write-n ( addr blk n ) loop over block-write n times (n <= 64)
-xt_block_write_n:
-        jsr underflow_3
-w_block_write_n:
-        ldy #1
-        bra blk_rw_n
-
-; block-read-n ( addr blk n ) loop over block-read n times (n <= 64)
-xt_block_read_n:
-        jsr underflow_3
-w_block_read_n:
-        ldy #0
-blk_rw_n:
-        sty blk_rw              ; 0=read, 1=write
-
-        lda 0,x
-        sta blk_n               ; block count (unsigned byte)
-        inx                     ; remove n from stack
-        inx
-        cmp #0                  ; any blocks to read?
-        beq _cleanup
-
-_loop:
-        jsr w_two_dup           ; ( addr blk addr blk )
-        ldy blk_rw
-        beq _rd
-        jsr w_block_write
-        bra +
-_rd:
-        jsr w_block_read
-+
-        lda #4                  ; addr += 1024 = $400
-        clc
-        adc 3,x
-        sta 3,x
-
-        inc 0,x                 ; blk += 1
-        bne +
-        inc 1,x
-+
-        dec blk_n               ; n--
-        bne _loop
-
-_cleanup:
-        jmp w_two_drop
-z_block_read_n:
-z_block_write_n:
-
-
-xt_block_boot:      ; ( -- )
-.if ARCH == "sim"
-        jsr w_block_c65_init
-.else
-        jsr w_block_sd_init
-.endif
-
-        inx                     ; pre-drop
-        inx
-        lda $fe,x
-        bne _chkfmt
-
-        lda #<_enoblk
-        ldy #>_enoblk
-_err:
-        sta tmp3
-        sty tmp3+1
-        jsr print_common
-        jmp w_cr
-
-_badblk:
-        lda #<_ebadblk
-        ldy #>_ebadblk
-        bra _err
-
-_enoblk:
-        .shift "block init failed"
-_ebadblk:
-        .shift "bad boot block"
-
-_chkfmt:
-        dex
-        dex
-        lda #<blk_loader
-        sta 0,x
-        lda #>blk_loader
-        sta 1,x
-        jsr w_zero
-        jsr w_block_read        ; <blk_loader> 0 block-read
-
-        ; valid boot block looks like TF<length16><code...>
-        lda blk_loader
-        cmp #'T'
-        bne _badblk
-        lda blk_loader+1
-        cmp #'F'
-        bne _badblk
-
-        dex
-        dex
-        dex
-        dex
-        lda #<blk_loader+4
-        sta 2,x
-        lda #>blk_loader+4
-        sta 3,x
-        lda blk_loader+2
-        sta 0,x
-        lda blk_loader+3
-        sta 1,x
-        jmp w_evaluate
-z_block_boot:
-
-
-; linkz decode 4 byte packed representation into 3 words
-;
-;           addr+3          addr+2             addr+1           addr+0
-;    +-----------------+-----------------+-----------------+-----------------+
-;    | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 |
-;    +------+-----+----+-----------------+--------------+--+-----------------+
-;    | . . .|  cf | dt |     dest        |     cobj     |          verb      |
-;    +------+-----+----+-----------------+--------------+--+-----------------+
-;             1,x   5,x      4,x               0,x       3,x       2,x
-xt_decode_link:     ; ( link-addr -- dest' verb cond' )
-        jsr underflow_1
-w_decode_link:
-        lda 0,x         ; copy addr to tmp1
-        sta tmp1
-        lda 1,x
-        sta tmp1+1
-
-        dex             ; make space for cond' @ 0-1, verb @ 2-3, dest at 4-5
-        dex
-        dex
-        dex
-
-        ldy #0
-        lda (tmp1),y
-        sta 2,x         ; verb lo
-        iny
-        lda (tmp1),y
-        lsr
-        sta 0,x         ; cond lo
-        lda #0
-        rol
-        sta 3,x         ; verb hi
-        iny
-        lda (tmp1),y
-        sta 4,x         ; dest lo
-        iny
-        lda (tmp1),y
-        tay
-        and #3
-        sta 5,x         ; dest hi
-        tya
-        lsr
-        lsr
-        sta 1,x         ; cond hi
-z_decode_link:
-        rts
-
-
-; ## typez ( strz digrams -- ) "emit a wrapped dizzy+woozy encoded string"
-; ## "typez"  tested ad hoc
-xt_typez:
-        jsr underflow_2
-w_typez:
-        lda (2,x)
-        beq _empty              ; skip empty string to avoid a newline
-
-        lda 0,x
-        sta txt_digrams
-        lda 1,x
-        sta txt_digrams+1
-
-        lda 2,x
-        sta txt_strz
-        lda 3,x
-        sta txt_strz+1
-
-        phx
-        jsr txt_typez           ; print encoded string plus trailing newline
-        plx
-
-_empty:
-        inx
-        inx
-        inx
-        inx
-
-z_typez:
-        rts
+;----------------------------------------------------------------------
+; EOF
+;----------------------------------------------------------------------

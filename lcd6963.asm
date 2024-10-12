@@ -125,7 +125,7 @@ lcd_show_cursor:
 
 lcd_putc:   ; (A) -> nil const X
     ; write A to ADP++
-.if ARCH == "sim"
+.if TALI_ARCH == "c65"
         sta io_putc
 .endif
         sec
@@ -187,7 +187,7 @@ _txt:
 -
         lda LCD_CMD             ; read status
         and #LCD_ST_AWR         ; wait for auto write status bit
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         beq -
 .endif
         lda (lcd_args),y
@@ -230,7 +230,7 @@ _attr:
 -
         lda LCD_CMD             ; read status
         and #LCD_ST_AWR         ; wait for auto write status bit
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         beq -
 .endif
         stz LCD_DATA            ; write byte and inc ADP
@@ -257,7 +257,7 @@ lcd_wait:   ; () -> nil const X, Y
 
         and #LCD_ST_RDY         ; check both bits are set
         eor #LCD_ST_RDY         ; mask and then eor so 0 if set
-.if ARCH != "sim"
+.if TALI_ARCH == "bb"
         bne -
 .endif
         rts

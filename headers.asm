@@ -2,8 +2,10 @@
 #nt_header le, "<="
 #nt_header random
 #nt_header randint
+#nt_header cls
 #nt_header tolower
 #nt_header asciiz, "asciiz>"
+
 #nt_header block_sd_init, "sd-init"
 #nt_header block_boot, "block-boot"
 #nt_header block_read_n, "block-read-n"

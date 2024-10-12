@@ -171,13 +171,13 @@ _wakeywakey:
         cpx #3
         bne _short
         ; wait 5ms+ after first call
-        lda #2              ; 2*2304 + 9*42 + 20 = 5006 cycles
-        ldy #42
+        lda #2              ; 20 + 2*256 * 10 * grain cycles
+        ldy #0
         bra _wait
 _short:  ; wait 160us+ after second and third call
-        lda #0              ; 2*0 + 9*16 + 20 = 164 cycles
+        lda #0              ; 20 + 16 * 10 * grain cycles
         ldy #16
-_wait:  jsr delay
+_wait:  jsr sleep
         dex
         bne _wakeywakey
 
