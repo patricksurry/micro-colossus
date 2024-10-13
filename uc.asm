@@ -24,23 +24,11 @@ TALI_OPTION_TERSE := 1
 AscFF       = $0f               ; form feed
 AscTab      = $09               ; tab
 
-; =====================================================================
 
-        * = zpage_end + 1       ; leave the bottom of zp for Tali
-.dsection zp
+ram_end = $bbff                 ; end of RAM for Tali (saving 1K screen buffer)
+TXT_BUF = address(ram_end+1)    ; 1K screen buffer (40*16 + 40*16/2 = 960 bytes)
 
-; =====================================================================
-
-        * = $8000
-
-.byte 0                         ; force 32kb image for EEPROM
-
-
-ram_end   = $bbff               ; end of installed RAM for Tali
-
-; ---------------------------------------------------------------------
-
-IOBASE    = address($c000)
+IOBASE  = address($c000)
 
 ; IO address decoding uses low 8 bits of address $c0xx
 ;
@@ -53,6 +41,16 @@ IOBASE    = address($c000)
 ; Bits D0-1 select VIA device 0 (none), KBD = 2, LCD = 3
 ; Bits R0-3 select VIA register or LCD C/D (R0)
 
+; =====================================================================
+
+        * = zpage_end + 1       ; leave the bottom of zp for Tali
+.dsection zp
+
+; =====================================================================
+
+        * = $8000
+
+.byte 0                         ; force 32kb image for EEPROM
 
 .if TALI_ARCH == "c65"
 
@@ -112,12 +110,17 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 ; kernel I/O routines
 
 kernel_init:
-    ; Custom initialization called as turnkey during forth startup
+    ; Hardware initialization called as turnkey during forth startup
+        jsr util_init
         jsr via_init
-        jsr kb_init             ; set up KB shift register to trigger interrupt
+        jsr spi_init
+        jsr tty_init
+        jsr kb_init
         jsr lcd_init
         jsr txt_init
-        jsr util_init
+
+        ; ready to deal with interrupts
+        cli
 
         ; Setup complete, show kernel string and return to forth
         lda #<s_kernel_id
@@ -192,7 +195,7 @@ s_kernel_id:
         .word forth             ; nmi
         .word forth             ; reset
 .if TALI_ARCH == "bb"
-        .word kb_isr            ; irq/brk
+        .word via_isr           ; irq/brk
 .else
         .word forth
 .endif

@@ -17,8 +17,8 @@ ucs.rom: $(wildcard *.asm)
 	python3 scripts/sortsym.py ucs.sym
 
 uct.rom: $(wildcard *.asm)
-	64tass -C --nostart --vice-labels --labels=ucs.sym --list=ucs.lst --output $@ uc.asm -D ARCH=\"term\" -D IDENT=${IDENT}
-	python3 scripts/sortsym.py ucs.sym
+	64tass -C --nostart --vice-labels --labels=uct.sym --list=uct.lst --output $@ uc.asm -D ARCH=\"term\" -D IDENT=${IDENT}
+	python3 scripts/sortsym.py uct.sym
 
 bb1.rom: $(wildcard *.asm)
 	64tass -C --nostart --labels=bb1.sym --list=bb1.lst --output $@ colossus.asm -D ARCH=\"bb1\" -D IDENT=${IDENT}

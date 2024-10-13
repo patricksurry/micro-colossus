@@ -1,14 +1,9 @@
 .if ARCH != "term"
 TXT_WIDTH       = LCD_COLS      ; screen width, < 256
 TXT_HEIGHT      = LCD_ROWS
-.else
-TXT_WIDTH       = 80            ; screen width, < 256
-TXT_HEIGHT      = 24
 .endif
 
-TXT_BUFFER      = ram_end+1
-
-.cwarn TXT_BUFFER % 1024, "Expected 1K boundary for TXT_BUFFER"
+.cwarn TXT_BUF % 1024, "Expected 1K boundary for TXT_BUF"
 
 .section zp
 
@@ -61,6 +56,7 @@ txt_init:
         ; set up two circular one page buffers
         ; both buffers start with head=tail,
         ; with buffer 0 at $600, buffer 1 at $700
+        ; these overlap the top half of the block-buffer
         stz cb_head
         stz cb_tail
         stz cb_head+2
@@ -182,7 +178,7 @@ txt_scrollup:
 
 ;TODO is the 5*128 scheme better?
 
-        lda #>TXT_BUFFER        ; starting address
+        lda #>TXT_BUF           ; starting address
         sta txt_offset+1
         stz txt_offset
 
@@ -213,10 +209,10 @@ _row:
 
 
 txt_cls:
-        lda #>(TXT_BUFFER + TXT_WIDTH*(TXT_HEIGHT+1))
+        lda #>(TXT_BUF + TXT_WIDTH*(TXT_HEIGHT+1))
         sta txt_offset+1
         stz txt_offset
-        ldy #<(TXT_BUFFER + TXT_WIDTH*(TXT_HEIGHT+1))
+        ldy #<(TXT_BUF + TXT_WIDTH*(TXT_HEIGHT+1))
 _page:
         lda #AscSP
 -
@@ -225,15 +221,15 @@ _page:
         bne -
         dec txt_offset+1
         lda txt_offset+1
-        cmp #>TXT_BUFFER
+        cmp #>TXT_BUF
         bpl _page
 
         stz txt_x
         stz txt_y
 
 txt_blit:
-        lda #<TXT_BUFFER
-        ldy #>TXT_BUFFER
+        lda #<TXT_BUF
+        ldy #>TXT_BUF
         jsr lcd_blit
 
         ; fall through and update current offset
@@ -266,7 +262,7 @@ txt_setxy:
         tya
         adc #0
         sta lcd_args+1
-        ora #(>TXT_BUFFER) & %1111_1100
+        ora #(>TXT_BUF) & %1111_1100
         sta txt_offset+1        ; set high bits for txt_offset
 
         jmp lcd_setadp
@@ -333,6 +329,7 @@ _refill:
 
 
 wrp_init:
+.if ARCH != "term"
         ; wrp_len tracks number of buffered chars, aka current col position 0,1,2...
         stz wrp_len
 wrp_new_page:
@@ -342,9 +339,10 @@ wrp_new_line:
         lda #$ff
         sta wrp_col         ; col index of latest break
         sta wrp_flg         ; set flg to -1 (skip leading ws)
+.endif
         rts
 
-wrp_putc:   ; buffer output via cb0 to kernel_putc
+wrp_putc:   ; buffer output via cb0 to txt_putc
 .if ARCH != "term"
         ; enter with latest character in A which is also buffered
         ; so will eventually be retrieved via cb0_get
@@ -400,7 +398,9 @@ _putln: tay                     ; save number of characters for loop
 _out:   jsr cb0_get             ; consume wrp_col+1 chars
         dey
         bmi _last               ; last char gets special treatment
-        jsr kernel_putc
+        phy
+        jsr txt_putc
+        ply
         bra _out
 
 _last:
@@ -411,7 +411,7 @@ _last:
         beq _eol                ; eat soft break at TXT_WIDTH
         lda #AscLF              ; otherwise add NL
 +
-        jsr kernel_putc         ; non-ws character is at EOL so no NL needed
+        jsr txt_putc            ; non-ws character is at EOL so no NL needed
 _eol:
         dec wrp_row             ; count the row
         beq _page
@@ -420,15 +420,16 @@ _eol:
 
 _page:
         jsr wrp_new_page        ; reset page wrap
+        ;TODO this needs to happen *before* we emit the char that causes new page
         jmp kernel_getc         ; wait for a key press
 .else
         pha
         jsr cb0_get
-        jsr kernel_putc
+        jsr txt_putc
         pla
         bne +
         lda #AscLF
-        jsr kernel_putc
+        jsr txt_putc
 +
         rts
 .endif

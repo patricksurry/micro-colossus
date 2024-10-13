@@ -67,8 +67,6 @@ sd_blk:     ; four byte block index (little endian)
 .endsection
 
 
-; TODO use SD_CD to check if SD card present
-
 ; we write to the VIA_SR with SD_CS low to shift a byte out to the SD
 ; this triggers an exchange where the SD writes a byte to the external SR
 ; which we can then read by selecting that device and reading port A
@@ -83,19 +81,12 @@ sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
         lda #SD_CS
         tsb DVC_CTRL
 
-        lda VIA_ACR             ; set up VIA for shift-out under PHI2
-        and #(255 - VIA_SR_MASK)
-        ora #VIA_SR_OUT_PHI2
-        sta VIA_ACR
-
-        ldx #20                 ; 20 * 8 = 160 clock transitions
-        lda #$ff
-
-        ; clock 20 x 8 hi-bits out without chip enable (CS hi)
+        ; clock 20 x 8 high bits out without chip enable (CS hi)
+        ldy #20                 ; 20 * 8 = 160 clock transitions
 -
-        sta SPI_SEND            ; 4 cycles
-        jsr delay12             ; need 18+ cycles to shift out 8 bits
-        dex                     ; 2 cycles
+        lda #$ff
+        jsr spi_exchbyte
+        dey                     ; 2 cycles
         bne -                   ; 2(+1) cycles
 
         ; now set CS low and send startup sequence
@@ -153,6 +144,13 @@ _fail:
         tya                     ; A has error code
 
         bra sd_exit
+
+
+sd_detect:
+    ; test whether card is present (Z clear) or not (Z set)
+        lda #SD_CD
+        bit DVC_CTRL
+        rts
 
 
 sd_rwcmd:

@@ -12,7 +12,7 @@ spk_delay16:    .word ?         ; the two byte delay() constant for one sixteent
 spk_tone:   ; (A) -> nil
     ; start playing midi note number in A (A=69 for A4 @ 440Hz; A=0 for C(-2))
         ldy #0                  ; rewrite A as Y * 12 + (A % 12)
-;TODO for 4x clock, start y at -2
+;TODO for 4x clock, start y at -2  (should later chk if <0)
         ldy #$fe
 _noct:  cmp #12                 ; Y = A // 12 (octave shifts)
         bmi _found

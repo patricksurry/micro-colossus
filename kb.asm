@@ -14,15 +14,8 @@ kb_init:    ; () -> nil const X, Y
     ; no keys yet
         stz kb_key7
         stz kb_key8
-    ; set up handshake mode and interrupt on data ready (CA1 falling edge)
-        lda VIA_PCR
-        and #(255-VIA_HS_CA1_MASK)
-        ora #VIA_HS_CA1_FALL
-        sta VIA_PCR
-        lda #(VIA_IER_SET | VIA_INT_CA1)
-        sta VIA_IER
-        cli                     ; ready to deal with interrupts
         rts
+
 
 kb_getc:    ; () -> A const X, Y
     ; wait for a keypress to appear in kb_key7 and return with bit 7 clear
@@ -32,6 +25,7 @@ kb_getc:    ; () -> A const X, Y
         and #$7f                ; clear top bit
         stz kb_key7             ; key taken
         rts
+
 
 kb_isr:     ; () -> nil const A, X, Y
     ; handle interrupt when keyboard byte is available

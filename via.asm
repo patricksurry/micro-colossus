@@ -109,14 +109,33 @@ TTY_CS  = %0100_0000  ; out, normally high (/CS)
 SPK_OUT = %1000_0000  ; out, normally low  (no tone)
 
 via_init:    ; () -> nil const X, Y
-        ; /CS should be initially high, others low
+        ; The /CS pins should be initially high, others low
         lda # SD_CS | TTY_CS
         sta DVC_CTRL
+        ; designate three output pins in port B
         lda # SD_CS | TTY_CS | SPK_OUT
-        sta DVC_CDR             ; designate three output pins
+        sta DVC_CDR
 
         lda #%0111_1111
         sta VIA_IER             ; disable all interrupts
         sta VIA_IFR             ; clear interrupt flags
+
+        ; set up interrupts on CA1 and CA2 falling edge
+        lda #(VIA_IER_SET | VIA_INT_CA1 | VIA_INT_CA2)
+        sta VIA_IER
+        lda #(VIA_HS_CA1_FALL | VIA_HS_CA2_IFALL)
+        sta VIA_PCR
+
         rts
 
+
+via_isr:
+        pha
+        lda VIA_IFR             ; IRQ | T1 | T2 | CB1 | CB2 | SR | CA1 | CA2
+        sta VIA_IFR             ; clear interrupt bit
+        lsr
+        pla
+        bcs +
+        jmp kb_isr
++
+        jmp tty_isr

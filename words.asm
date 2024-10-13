@@ -385,23 +385,14 @@ xt_block_boot:      ; ( -- )
         lda $fe,x
         bne _chkfmt
 
-        lda #<_enoblk
-        ldy #>_enoblk
-_err:
-        sta tmp3
-        sty tmp3+1
-        jsr print_common
-        jmp w_cr
+        lda #<sd_enoblk
+        ldy #>sd_enoblk
+        bra sd_err
 
 _badblk:
-        lda #<_ebadblk
-        ldy #>_ebadblk
-        bra _err
-
-_enoblk:
-        .shift "block init failed"
-_ebadblk:
-        .shift "bad boot block"
+        lda #<sd_ebadblk
+        ldy #>sd_ebadblk
+        bra sd_err
 
 _chkfmt:
         dex
@@ -433,8 +424,23 @@ _chkfmt:
         sta 0,x
         lda blk_loader+3
         sta 1,x
-        jmp w_evaluate
+        jsr w_evaluate
+        jmp w_execute
 z_block_boot:
+
+
+sd_err:
+        sta tmp3
+        sty tmp3+1
+        jsr print_common
+        jmp w_cr
+
+sd_enoblk:
+        .shift "block init failed"
+sd_ebadblk:
+        .shift "bad boot block"
+sd_enocard:
+        .shift "no card found"
 
 
 ;----------------------------------------------------------------------
@@ -498,7 +504,7 @@ sd_blk_rw:
         lda 3,x
         sta sd_bufp+1
 
-        stz sd_blk+2            ; hi bytes are usually
+        stz sd_blk+2            ; hi bytes usually zero
         stz sd_blk+3
 
         lda 0,x                 ; double the index
@@ -514,6 +520,13 @@ sd_blk_rw:
         inx
         inx
 
+        jsr sd_detect
+        bne +
+
+        lda #<sd_enocard
+        ldy #>sd_ebadblk
+        jmp sd_err
++
         phx                     ; save forth data stack pointer
         bvc _read
 
