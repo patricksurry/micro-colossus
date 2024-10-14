@@ -1,7 +1,5 @@
-.if ARCH != "term"
 TXT_WIDTH       = LCD_COLS      ; screen width, < 256
 TXT_HEIGHT      = LCD_ROWS
-.endif
 
 .cwarn TXT_BUF % 1024, "Expected 1K boundary for TXT_BUF"
 
@@ -11,6 +9,7 @@ txt_x       .byte ?
 txt_y       .byte ?
 txt_offset  .word ?
 txt_tmp     .byte ?
+txt_pager   .byte ?             ; counts number of scroll events between key press
 
 txt_str:
 txt_strz    .word ?             ; input zero-terminated string
@@ -19,7 +18,6 @@ txt_digrams .word ?             ; digram lookup table (128 2-byte pairs)
 
 ; unwrap temps
 wrp_len     .byte ?             ; number of cols buffered this line
-wrp_row     .byte ?             ; number of rows left in this page
 wrp_col     .byte ?             ; best current break column
 wrp_flg     .byte ?
 
@@ -73,11 +71,10 @@ txt_init:
 
 txt_putc:   ; (A) -> nil const X
     ; put printable chr A (stomped) at the current position, handle bksp, tab, CR, LF
-.if TALI_ARCH == "bb"
+.if TALI_ARCH != "c65"
         cmp #AscBS
         beq _bksp
 .endif
-.if ARCH != "term"
         ldy txt_y               ; do we need to scroll before new character?
         cpy #TXT_HEIGHT
         bmi +
@@ -105,19 +102,16 @@ _putc:
         bmi +
         stz txt_x               ; wrap to start of next line
         inc txt_y               ; NB don't check for scroll yet
-.if ARCH == "sim"
+        inc txt_pager           ; count rows between keypresses
+.if TALI_ARCH == "c65"
         lda #'|'
         sta io_putc
         lda #AscLF
         sta io_putc
 .endif
 +
-.else
-        sta io_putc
-.endif
         rts
 
-.if ARCH != "term"
         ; go back, write a space, go back again
 _bksp:  pha                     ; save nozero chr as flag
 _back:  dec txt_x
@@ -157,7 +151,6 @@ _fill:  lda #' '                ; fill until txt_x zeros all bits in mask
         bpl txt_scrollup
 
 _done:  rts
-.endif
 
 
 txt_puts:
@@ -172,9 +165,13 @@ txt_puts:
         rts
 
 
-.if ARCH != "term"
 txt_scrollup:
         ; not safe to use Forth words that change tmps since this might be called any time
+        lda txt_pager
+        cmp #TXT_HEIGHT
+        bne +
+        jsr kernel_getc         ; wait for a key press
++
 
 ;TODO is the 5*128 scheme better?
 
@@ -286,14 +283,6 @@ txt_show_cursor:
 txt_hide_cursor:
         jmp lcd_hide_cursor
 
-.else
-
-txt_cls:
-txt_show_cursor:
-txt_hide_cursor:
-        rts
-
-.endif
 
 ; Simple circular buffer implementation, with optional src/snk handlers
 
@@ -329,21 +318,15 @@ _refill:
 
 
 wrp_init:
-.if ARCH != "term"
         ; wrp_len tracks number of buffered chars, aka current col position 0,1,2...
         stz wrp_len
-wrp_new_page:
-        lda #TXT_HEIGHT
-        sta wrp_row
 wrp_new_line:
         lda #$ff
         sta wrp_col         ; col index of latest break
         sta wrp_flg         ; set flg to -1 (skip leading ws)
-.endif
         rts
 
 wrp_putc:   ; buffer output via cb0 to txt_putc
-.if ARCH != "term"
         ; enter with latest character in A which is also buffered
         ; so will eventually be retrieved via cb0_get
         ; the goal here is to track potential line and page breaks
@@ -408,31 +391,13 @@ _last:
         bpl +
         lda wrp_col
         cmp #TXT_WIDTH
-        beq _eol                ; eat soft break at TXT_WIDTH
+        beq wrp_new_line        ; eat soft break at TXT_WIDTH
+
         lda #AscLF              ; otherwise add NL
 +
         jsr txt_putc            ; non-ws character is at EOL so no NL needed
-_eol:
-        dec wrp_row             ; count the row
-        beq _page
+        bra wrp_new_line        ; set state for new line and return
 
-        jmp wrp_new_line        ; set state for new line and return
-
-_page:
-        jsr wrp_new_page        ; reset page wrap
-        ;TODO this needs to happen *before* we emit the char that causes new page
-        jmp kernel_getc         ; wait for a key press
-.else
-        pha
-        jsr cb0_get
-        jsr txt_putc
-        pla
-        bne +
-        lda #AscLF
-        jsr txt_putc
-+
-        rts
-.endif
 
 
 txt_typez:   ;  (txt_strz, txt_digrams via buf1) -> buf0

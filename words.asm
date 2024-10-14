@@ -380,21 +380,11 @@ xt_block_boot:      ; ( -- )
         jsr w_block_sd_init
 .endif
 
-        inx                     ; pre-drop
+        inx                     ; pre-drop result
         inx
         lda $fe,x
-        bne _chkfmt
+        beq sd_enoblk
 
-        lda #<sd_enoblk
-        ldy #>sd_enoblk
-        bra sd_err
-
-_badblk:
-        lda #<sd_ebadblk
-        ldy #>sd_ebadblk
-        bra sd_err
-
-_chkfmt:
         dex
         dex
         lda #<blk_loader
@@ -407,10 +397,10 @@ _chkfmt:
         ; valid boot block looks like TF<length16><code...>
         lda blk_loader
         cmp #'T'
-        bne _badblk
+        bne sd_ebadblk
         lda blk_loader+1
         cmp #'F'
-        bne _badblk
+        bne sd_ebadblk
 
         dex
         dex
@@ -429,17 +419,28 @@ _chkfmt:
 z_block_boot:
 
 
-sd_err:
+sd_ebadblk:
+        lda #<s_ebadblk
+        ldy #>s_ebadblk
+        bra +
+sd_enoblk:
+        lda #<s_enoblk
+        ldy #>s_enoblk
+        bra +
+sd_enocard:
+        lda #<s_enocard
+        ldy #>s_enocard
++
         sta tmp3
         sty tmp3+1
         jsr print_common
         jmp w_cr
 
-sd_enoblk:
+s_enoblk:
         .shift "block init failed"
-sd_ebadblk:
+s_ebadblk:
         .shift "bad boot block"
-sd_enocard:
+s_enocard:
         .shift "no card found"
 
 
@@ -451,18 +452,24 @@ xt_block_sd_init:       ; ( -- true | false )
 w_block_sd_init:
         ; low level SD card init
         phx
-
+        jsr sd_detect
+        bne +
+        jsr sd_enocard
+        bra _fail
++
         jsr sd_init             ; try to init SD card
         beq +                   ; returns A=0 on success, with Z flag
+_fail:
         lda #$ff
 +
         plx
-        ora #$ff                ; invert so we have true on success, false on failure
 
         dex                     ; return status
         dex
+        eor #$ff                ; invert so we have true on success, false on failure
         sta 0,x
         sta 1,x
+        beq z_block_sd_init     ; don't set vectors if we failed
 
         dex                     ; set block read vector
         dex
@@ -522,10 +529,7 @@ sd_blk_rw:
 
         jsr sd_detect
         bne +
-
-        lda #<sd_enocard
-        ldy #>sd_ebadblk
-        jmp sd_err
+        jmp sd_enocard          ; exit with error
 +
         phx                     ; save forth data stack pointer
         bvc _read

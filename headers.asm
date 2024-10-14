@@ -6,7 +6,7 @@
 #nt_header tolower
 #nt_header asciiz, "asciiz>"
 
-#nt_header block_sd_init, "sd-init"
+#nt_header block_sd_init, "block-sd-init"
 #nt_header block_boot, "block-boot"
 #nt_header block_read_n, "block-read-n"
 #nt_header block_write_n, "block-write-n"

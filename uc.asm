@@ -5,17 +5,11 @@
         .enc "none"
 
 .weak
-ARCH            = "sim"         ; sim | term | bb1 | bb2
 TESTS           = 0             ; enable tests?
 .endweak
 
 ; For our minimal build, we'll drop all the optional words
 
-.if ARCH == "sim" || ARCH == "term"
-TALI_ARCH := "c65"
-.else
-TALI_ARCH := "bb"
-.endif
 TALI_OPTIONAL_WORDS := [ "block" ]      ; [ "disassembler" ]
 TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 0
@@ -129,7 +123,7 @@ kernel_init:
         sta txt_str+1
         jsr txt_puts
 
-.if TALI_ARCH == "bb"
+.if TALI_ARCH != "c65"
         lda #<spk_morse
         sta morse_emit
         lda #>spk_morse
@@ -153,7 +147,7 @@ kernel_getc:
         phy
         jsr txt_show_cursor
 ;TODO in a non-blocking version we should inc rand16 l/h (skip 0)
-.if TALI_ARCH == "bb"
+.if TALI_ARCH != "c65"
         jsr kb_getc             ; preserves X and Y
 .else
 -
@@ -164,6 +158,7 @@ kernel_getc:
         jsr txt_hide_cursor
         pla
         ply
+        stz txt_pager           ; reset pager count
         rts
 
 
@@ -194,7 +189,7 @@ s_kernel_id:
         .word kernel_init       ; turnkey vector
         .word forth             ; nmi
         .word forth             ; reset
-.if TALI_ARCH == "bb"
+.if TALI_ARCH != "c65"
         .word via_isr           ; irq/brk
 .else
         .word forth

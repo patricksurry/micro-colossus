@@ -1,6 +1,9 @@
 TODO
 ===
 
+- block-boot: bad boot block
+- sd-init ok
+
 - [x] block-boot should eval to get an xt then execute
 - [x] SD_CD works (high when card present); use in startup check
 

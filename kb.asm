@@ -10,6 +10,9 @@ kb_key8:    .byte ?          ; last full 8-bit character received
 .endsection
 
 
+KB_RECV = address(DVC_DATA | VIA_DVC_KBD)
+
+
 kb_init:    ; () -> nil const X, Y
     ; no keys yet
         stz kb_key7
@@ -37,7 +40,7 @@ kb_isr:     ; () -> nil const A, X, Y
         stz DVC_DDR             ; set data port for reading
         ; fetch whilst enabling KB shift-register
         ; reading port A also clears the VIA interrupt flag
-        lda DVC_DATA | VIA_DVC_KBD
+        lda KB_RECV
 
         sta kb_key8             ; store original
         ora #$80                ; flag key ready

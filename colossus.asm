@@ -4,7 +4,6 @@
         .enc "none"
 
 .weak
-ARCH    = "sim"               ; or bb1 or bb2
 DEBUG   = 0                   ; compile unit tests?
 .endweak
 
@@ -14,13 +13,13 @@ SCR_HEIGHT  = 16
         * = zpage_end + 1
 .dsection zp
 
-.if ARCH == "bb1"
+.if TALI_ARCH == "bb1"
 ram_end   = $3fff               ; end of installed RAM
 .else
-ram_end   = $bfff               ; end of installed RAM
+ram_end   = $bfff               ; c65 or bb2
 .endif
 
-.if ARCH == "sim"
+.if TALI_ARCH == "c65"
 
 io_start = $c000                ; virtual hardware addresses for the simulators
 
@@ -47,7 +46,7 @@ io_blk_buffer:  .word ?     ; $f014     Little endian memory address
 .endif
 
 ; Where to start Tali Forth 2 in ROM (or RAM if loading it)
-.if ARCH == "bb1"
+.if TALI_ARCH == "bb1"
         * = $8000
 .else
         * = $c100
@@ -104,7 +103,7 @@ kernel_warm:
                 ; custom initialization
                 jsr txt_init
                 jsr util_init
-.if ARCH != "sim"
+.if TALI_ARCH != "c65"
                 jsr via_init
                 jsr spk_init
 
@@ -164,7 +163,7 @@ kernel_bye:
 s_kernel_id:
         .text "Tali Forth 2 Adventure (" .. ARCH .. " " .. GITSHA .. ")", 0
 
-.if ARCH != "sim"
+.if TALI_ARCH != "c65"
 kernel_getc = kb_getc           ; preserves X and Y
 
 kernel_putc:
@@ -202,14 +201,14 @@ kernel_putc:
 
 ; Add the interrupt vectors
 * = $fff8
-.if ARCH == "sim"
+.if TALI_ARCH == "c65"
         .word xt_blk_boot
 .else
         .word 0         ; for now just boot vanilla forth
 .endif
         .word kernel_init       ; nmi
         .word kernel_init       ; reset
-.if ARCH == "sim"
+.if TALI_ARCH == "c65"
         .word kernel_init       ; irq/brk
 .else
         .word kb_isr

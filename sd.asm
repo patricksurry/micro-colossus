@@ -60,14 +60,20 @@ For FAT32 layout see https://www.pjrc.com/tech/8051/ide/fat32.html
 
 sd_cmdp:    ; two byte pointer to a command sequence
 sd_bufp:    ; or two byte pointer to data buffer
+sd_err:     ; or two byte of error info
     .word ?
 sd_blk:     ; four byte block index (little endian)
     .dword ?
 
 .endsection
 
+sd_err_wake     = $e0
+sd_err_rw       = $e1
+sd_err_dstok    = $e2
+sd_err_wstat    = $e3
 
-; we write to the VIA_SR with SD_CS low to shift a byte out to the SD
+
+; we write to the SPI_SR with SD_CS low to shift a byte out to the SD
 ; this triggers an exchange where the SD writes a byte to the external SR
 ; which we can then read by selecting that device and reading port A
 
@@ -84,8 +90,7 @@ sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
         ; clock 20 x 8 high bits out without chip enable (CS hi)
         ldy #20                 ; 20 * 8 = 160 clock transitions
 -
-        lda #$ff
-        jsr spi_exchbyte
+        jsr spi_readbyte        ; sends $ff
         dey                     ; 2 cycles
         bne -                   ; 2(+1) cycles
 
@@ -125,19 +130,21 @@ _cmd55:
         cmp #1
         bne _fail
 
-        lda #4                  ; wait a few millis and try again
+        lda #$10                ; wait a few millis and try again
         jsr sleep
 
         dex
         bne _cmd55
-        lda #$dd
+
+        ldx #sd_err_wake
+        txa
+        bra sd_exit
 
 _fail:
         cmp #0
         bne +                   ; need to return a non-zero code
         lda #$ee
 +
-        stx sd_blk              ;TODO debug
         tay
         lda (sd_cmdp)           ; report the failing command
         tax                     ; X has failing command
@@ -159,7 +166,7 @@ sd_rwcmd:
         ora #$40                ; set bit six of command
         tay
 
-        ; activate card
+        ; select card
         lda #SD_CS
         trb DVC_CTRL
 
@@ -178,7 +185,7 @@ sd_rwcmd:
         inc sd_blk,x
         beq -
 
-        ldx #$ee                ;TODO error code
+        ldx #sd_err_rw
 
         lda #1                  ; send CRC 0 with termination bit
         sta SPI_SEND
@@ -195,7 +202,12 @@ sd_exit:
         lda #SD_CS
         tsb DVC_CTRL
         tya
+        beq +
+        sta sd_err
+        stx sd_err+1
++
         rts
+
 
 
 sd_readblock:
@@ -205,7 +217,7 @@ sd_readblock:
         lda #17
         jsr sd_rwcmd
 
-        ldx #$dd                ;TODO
+        ldx #sd_err_dstok
 
         jsr sd_await            ; wait for data start token #$fe
         ina                     ; A=$fe on success, +2 => 0
@@ -268,7 +280,7 @@ sd_writeblock:
         bra -
 
 _check:
-        ldx #$cc                ;TODO
+        ldx #sd_err_wstat
 
         jsr sd_await            ; data response is xxx0sss1 where x is don't care
         and #$1f                ; and sss is status (010 ok, 101 CRC err, 110 write err)

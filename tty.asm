@@ -1,12 +1,15 @@
 .cwarn cold_user_table_end - cold_user_table > 127, "Expected user table < 128 bytes"
 .cwarn cp0 & $7f, "Expected cp0 on page boundary"
 
-tty_buf = address(cp0 + 128)    ; Steal half a page above user variables
+tty_buf = address(cp0 + $80)    ; Steal half a page above user variables
+
 
 .section zp
+
 tty_head:   .byte ?             ; index of next free buffer slot
 tty_tail:   .byte ?             ; index of first value (if != tty_head)
 tty_data:   .word ?             ; 16-bit word for r/w
+
 .endsection
 
 
@@ -26,11 +29,19 @@ tty_rw:     ; () -> nil, X,Y const
 
         lda tty_data+1
         jsr spi_exchbyte
-        sta tty_data+1
+        ; on data write, abort if T is not set
+        bit tty_data+1          ; test input: bit 7 (N) indicates write, bit 6 indicates cfg
+        sta tty_data+1          ; save output
+        bpl +                   ; read (data or cfg)?
+        bvs +                   ; cfg write?
+
+        bit tty_data+1          ; data write, check T (bit 6)
+        bvc _abort              ; not ready to transmit
++
         lda tty_data
         jsr spi_exchbyte
         sta tty_data
-
+_abort:
         lda #TTY_CS             ; disable UART
         tsb DVC_CTRL
         rts
@@ -85,7 +96,7 @@ _done:
 
         ply
         pla
-        rts
+        rti
 
 
 tty_getc:   ; () -> A; X,Y const
@@ -100,7 +111,7 @@ tty_getc:   ; () -> A; X,Y const
 -
         ldy tty_tail            ; wait for buffer via ISR
         cpy tty_head
-        bne -
+        beq -
 
         lda tty_buf,y
         iny
@@ -116,12 +127,16 @@ tty_getc:   ; () -> A; X,Y const
 tty_putc:   ; (A) -> nil, X,Y const
         phy
         sta tty_data            ; data byte
-        ldy #%00100000
+_retry:
         jsr tty_getrts          ; C gives RTS status
+        lda #%00100000
         rol
         asl ;%100000c0
-        sty tty_data+1          ; write with RTS status bit
+        sta tty_data+1          ; write with RTS status bit
         jsr tty_rw
-        ;TODO check if we also received a byte?
+        bvc _retry              ; retry if write failed
+
+        ;TODO do we also need to check if we received a byte?
+
         ply
         rts

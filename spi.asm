@@ -1,6 +1,7 @@
 SPI_RECV = address(DVC_DATA | VIA_DVC_SPI)
 SPI_SEND = VIA_SR
 
+
 spi_init:   ; () -> (); X,Y const
     ; set up VIA for shift-out under PHI2 aka SPI_SEND
         lda VIA_ACR
@@ -8,6 +9,7 @@ spi_init:   ; () -> (); X,Y const
         ora #VIA_SR_OUT_PHI2
         sta VIA_ACR
         rts
+
 
 spi_readbyte:   ; () -> A; X,Y const
     ; trigger an SPI byte exchange and return the result
