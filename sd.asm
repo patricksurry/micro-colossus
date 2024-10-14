@@ -156,7 +156,7 @@ _fail:
 sd_detect:
     ; test whether card is present (Z clear) or not (Z set)
         lda #SD_CD
-        bit DVC_CTRL
+        and DVC_CTRL
         rts
 
 
@@ -229,7 +229,7 @@ sd_readblock:
 
         ldx #$ff
         bit sd_cmd0             ; set overflow as page 0 indicator (all cmd bytes have bit 6 set)
-        stx SPI_SEND            ; 4 cycles      trigger first byte in
+        stx SPI_SEND            ; 4 cycles      trigger first exchange
         jsr delay12             ; 12 cycles
         ldy #0                  ; 2 cycles      byte counter
 -
@@ -247,7 +247,7 @@ sd_readblock:
 
 _crc:
         ;TODO check crc-16
-        lda SPI_RECV            ; first byte of crc-16
+        lda SPI_RECV            ; first byte of crc-16, completing final exchange
         jsr spi_readbyte        ; second byte of crc-16
 
         lda #0                  ; success

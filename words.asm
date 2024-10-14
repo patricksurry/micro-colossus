@@ -320,24 +320,25 @@ z_decode_link:
 blk_loader = $400
 
 .section zp
-blk_n   .byte ?
-blk_rw  .byte ?
+blk_rw  .byte ?                 ; 0 is read, 1 is write
+blk_n   .byte ?                 ; number of blocks to read/write
 .endsection
 
 ; block-write-n ( addr blk n ) loop over block-write n times (n <= 64)
 xt_block_write_n:
         jsr underflow_3
 w_block_write_n:
-        ldy #1
-        bra blk_rw_n
+        sec
+        bra blk_rw_n_common
 
 ; block-read-n ( addr blk n ) loop over block-read n times (n <= 64)
 xt_block_read_n:
         jsr underflow_3
 w_block_read_n:
-        ldy #0
-blk_rw_n:
-        sty blk_rw              ; 0=read, 1=write
+        clc
+blk_rw_n_common:
+        stz blk_rw
+        rol blk_rw
 
         lda 0,x
         sta blk_n               ; block count (unsigned byte)
@@ -499,13 +500,16 @@ z_block_sd_init:
 ; This only addresses a fraction of the full addressable SD space.
 
 sd_blk_write:    ; ( addr u -- )
-        bit z_block_sd_init     ; set V=1
+        sec
         bra sd_blk_rw
 
 sd_blk_read:    ; ( addr u -- )
-        clv                     ; set V=0
+        clc
 
 sd_blk_rw:
+        stz blk_rw
+        rol blk_rw
+
         lda 2,x
         sta sd_bufp
         lda 3,x
@@ -532,7 +536,8 @@ sd_blk_rw:
         jmp sd_enocard          ; exit with error
 +
         phx                     ; save forth data stack pointer
-        bvc _read
+        lda blk_rw
+        beq _read
 
         jsr sd_writeblock
         bne _done
@@ -555,16 +560,18 @@ _done:
 xt_sd_raw_write:   ; ( addr ud n -- 0|err )
         jsr underflow_4
 w_sd_raw_write:
-        ldy #1
+        sec
         bra sd_raw_rw
 
 xt_sd_raw_read:    ; ( addr ud n -- 0|err )
         jsr underflow_4
 w_sd_raw_read:
-        ldy #0
+        clc
 
 sd_raw_rw:
-        sty blk_rw              ; remember read or write
+        stz blk_rw
+        rol blk_rw              ; remember read or write
+
         lda 6,x
         sta sd_bufp
         lda 7,x
