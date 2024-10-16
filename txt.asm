@@ -154,13 +154,14 @@ _done:  rts
 
 
 txt_puts:
+-
         lda (txt_str)
         beq +
         jsr txt_putc
         inc txt_str
-        bne txt_puts
+        bne -
         inc txt_str+1
-        bra txt_puts
+        bra -
 +
         rts
 

@@ -6,12 +6,15 @@
 #nt_header tolower
 #nt_header asciiz, "asciiz>"
 
-#nt_header block_sd_init, "block-sd-init"
 #nt_header block_boot, "block-boot"
 #nt_header block_read_n, "block-read-n"
 #nt_header block_write_n, "block-write-n"
-#nt_header sd_raw_read, "sd-raw-read"
-#nt_header sd_raw_write, "sd-raw-write"
+
+.if TALI_ARCH != "c65"
+#nt_header block_sd_init, "block-sd-init"
+; #nt_header sd_raw_read, "sd-raw-read"
+; #nt_header sd_raw_write, "sd-raw-write"
+.endif
 
 #nt_header unpack
 #nt_header pack

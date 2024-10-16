@@ -46,32 +46,6 @@ IOBASE  = address($c000)
 
 .byte 0                         ; force 32kb image for EEPROM
 
-.if TALI_ARCH == "c65"
-
-        * = $ff00               ; use top memory to avoid stomping IO page
-
-; Define the c65 / py65mon magic IO addresses relative to $ff00
-                .byte ?
-io_putc:        .byte ?         ; +1     write byte to stdout
-                .byte ?
-io_kbhit:       .byte ?         ; +3     read non-zero on key ready (c65 only)
-io_getc:        .byte ?         ; +4     non-blocking read input character (0 if no key)
-                .byte ?
-io_clk_start:   .byte ?         ; +6     *read* to start cycle counter
-io_clk_stop:    .byte ?         ; +7     *read* to stop the cycle counter
-io_clk_cycles:  .word ?,?       ; +8-b   32-bit cycle count in NUXI order
-                .word ?,?
-
-; These magic block IO addresses are only implemented by c65 (not py65mon)
-; see c65/README.md for more detail
-
-io_blk_action:  .byte ?         ; +$10     Write to act (status=0 read=1 write=2)
-io_blk_status:  .byte ?         ; +$11     Read action result (OK=0)
-io_blk_number:  .word ?         ; +$12     Little endian block number 0-ffff
-io_blk_buffer:  .word ?         ; +$14     Little endian memory address
-
-.endif
-
 ; ---------------------------------------------------------------------
 ; Start of code
 
@@ -96,6 +70,7 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 .include "morse.asm"
 .include "txt.asm"
 .include "words.asm"
+.include "dasm.asm"
 .if TESTS
 .include "memtest.asm"
 .endif
@@ -180,6 +155,37 @@ s_kernel_id:
         .text "  | |   `", AscLF
         .text "  |_|  TaliForth2 " .. IDENT, AscLF
         .byte AscLF, 0
+
+; =====================================================================
+; Simulator IO definitions
+
+.cwarn * >= $ffe0, "Magic IO conflict"
+
+.if TALI_ARCH == "c65"
+
+        * = $ffe0               ; use top memory to avoid stomping IO page
+
+; Define the c65 / py65mon magic IO addresses relative to $ff00
+                .byte ?
+io_putc:        .byte ?         ; +1     write byte to stdout
+                .byte ?
+io_kbhit:       .byte ?         ; +3     read non-zero on key ready (c65 only)
+io_getc:        .byte ?         ; +4     non-blocking read input character (0 if no key)
+                .byte ?
+io_clk_start:   .byte ?         ; +6     *read* to start cycle counter
+io_clk_stop:    .byte ?         ; +7     *read* to stop the cycle counter
+io_clk_cycles:  .word ?,?       ; +8-b   32-bit cycle count in NUXI order
+                .word ?,?
+
+; These magic block IO addresses are only implemented by c65 (not py65mon)
+; see c65/README.md for more detail
+
+io_blk_action:  .byte ?         ; +$10     Write to act (status=0 read=1 write=2)
+io_blk_status:  .byte ?         ; +$11     Read action result (OK=0)
+io_blk_number:  .word ?         ; +$12     Little endian block number 0-ffff
+io_blk_buffer:  .word ?         ; +$14     Little endian memory address
+
+.endif
 
 ; =====================================================================
 ; System vectors

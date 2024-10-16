@@ -13,6 +13,8 @@ tty_data:   .word ?             ; 16-bit word for r/w
 .endsection
 
 
+;TODO set RTS on init
+
 tty_init:
         stz tty_head
         stz tty_tail
@@ -71,29 +73,27 @@ tty_isr:    ; () -> nil const A, X, Y
         pha
         phy
 
-        ldy tty_head
 -
         stz tty_data+1          ; read
         stz tty_data
-        jsr tty_rw
+        jsr tty_rw              ; exchange bytes
         bit tty_data+1
         bpl _done               ; R=0 means no data
         lda tty_data
+        ldy tty_head
         sta tty_buf,y
 
         jsr tty_getrts
         bne +
-        clc
+        clc                     ; hit threshold, tell sender to stop
         jsr tty_setrts
 +
-        iny
+        inc tty_head
         bpl -
-        ldy #0
+        stz tty_head
         bra -
 
 _done:
-        sty tty_head
-
         ply
         pla
         rti

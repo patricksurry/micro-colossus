@@ -150,6 +150,100 @@ w_cls:
 z_cls:
                 rts
 
+
+xt_dump:  ; ( addr n )
+                jsr underflow_2
+w_dump:
+                jsr w_cr
+
+                lda 2,x                 ; copy addr to tmp1 for y-indexing
+                and #$f8                ; mask off low bits to start from multiple of 8
+                sta tmp2
+                lda 3,x
+                sta tmp2+1
+
+                lda 2,x
+                and #7
+                sta tmp1                ; index of first byte this row
+
+                clc
+                adc 0,x
+                cmp #8
+                bcs _max
+
+                ldy 1,x
+                beq +
+_max:
+                lda #8
++
+                cmp tmp1
+                beq _done               ; if first == last, we're done
+
+                sta tmp1+1              ; index of last byte this row
+
+                ; show current address
+                lda 3,x
+                ldy 2,x
+                jsr word_to_ascii
+                jsr w_space
+
+                lda #%0100_0000
+                sta tmptos              ; pass counter $40 -> $80 -> 0
+_pass:
+                ldy #0
+                jsr w_space
+_loop:
+                bit tmptos
+
+                cpy tmp1
+                bcc _skip
+                cpy tmp1+1
+                bcs _skip
+
+                lda (tmp2),y
+                bvc _chr
+
+                jsr byte_to_ascii       ; show byte value
+                bra _spnext
+_chr:
+                jsr is_printable        ; show ascii char
+                bcs +
+                lda #'.'                ; use dot if not printable
++
+                jsr emit_a
+                bra _next
+_skip:
+                bvc _spnext
+                jsr w_space
+                jsr w_space
+_spnext:
+                jsr w_space
+_next:
+                iny
+                cpy #8
+                bne _loop
+
+                asl tmptos
+                bne _pass
+
+                dex
+                dex
+                lda tmp1+1
+                sbc tmp1                ; C=1 from asl
+                stz 1,x
+                sta 0,x
+                jsr w_slash_string
+
+                bra w_dump
+
+_done:
+                inx
+                inx
+                inx
+                inx
+z_dump:
+                rts
+
 ;----------------------------------------------------------------------
 ; string helpers
 ;----------------------------------------------------------------------
@@ -384,7 +478,7 @@ xt_block_boot:      ; ( -- )
         inx                     ; pre-drop result
         inx
         lda $fe,x
-        beq sd_enoblk
+        beq sd_eblkini
 
         dex
         dex
@@ -421,33 +515,35 @@ z_block_boot:
 
 
 sd_ebadblk:
-        lda #<s_ebadblk
-        ldy #>s_ebadblk
+        lda #<es_badblk
+        ldy #>es_badblk
         bra +
-sd_enoblk:
-        lda #<s_enoblk
-        ldy #>s_enoblk
+sd_eblkini:
+        lda #<es_blkini
+        ldy #>es_blkini
         bra +
 sd_enocard:
-        lda #<s_enocard
-        ldy #>s_enocard
+        lda #<es_nocard
+        ldy #>es_nocard
 +
         sta tmp3
         sty tmp3+1
         jsr print_common
         jmp w_cr
 
-s_enoblk:
-        .shift "block init failed"
-s_ebadblk:
-        .shift "bad boot block"
-s_enocard:
-        .shift "no card found"
+es_blkini:
+        .shift "EBLKINI"
+es_badblk:
+        .shift "EBADBLK"
+es_nocard:
+        .shift "ENOCARD"
 
 
 ;----------------------------------------------------------------------
 ; SD card words
 ;----------------------------------------------------------------------
+
+.if TALI_ARCH != "c65"
 
 xt_block_sd_init:       ; ( -- true | false )
 w_block_sd_init:
@@ -553,6 +649,7 @@ _done:
         plx
         rts
 
+.comment TODO omit for now
 
 ; low level words to read and write n 512 byte SD blocks using a 32 bit index
 ; note these routines return 0 on success or a non-zero error status
@@ -625,6 +722,9 @@ z_sd_raw_read:
 z_sd_raw_write:
         rts
 
+.endcomment
+
+.endif
 
 ;----------------------------------------------------------------------
 ; EOF
