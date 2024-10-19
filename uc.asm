@@ -10,10 +10,13 @@ TESTS           = 0             ; enable tests?
 
 ; For our minimal build, we'll drop all the optional words
 
-TALI_OPTIONAL_WORDS := [ "block" ]      ; [ "disassembler" ]
+TALI_OPTIONAL_WORDS := [ "block", "noextras" ]
 TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 0
 TALI_OPTION_TERSE := 1
+
+TALI_CONTRIB := ["adventure", "block", "byte", "core", "dasm", "dmp", "rand", "sd", "srecord", "string"]
+TALI_ALT := ["dump", "page"]
 
 AscFF       = $0f               ; form feed
 AscTab      = $09               ; tab
@@ -53,8 +56,6 @@ IOBASE  = address($c000)
 
 ; Make sure TALI_xxx options are set BEFORE this include.
 
-TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
-
 .include "../tali/taliforth.asm"
 
 .include "util.asm"
@@ -66,11 +67,8 @@ TALI_USER_HEADERS := "../../micro-colossus/headers.asm"
 .include "spi.asm"
 .include "sd.asm"
 .include "tty.asm"
-
 .include "morse.asm"
 .include "txt.asm"
-.include "words.asm"
-.include "dasm.asm"
 .if TESTS
 .include "memtest.asm"
 .endif
@@ -109,9 +107,7 @@ kernel_init:
         lda #'S'
         jsr morse_send
 .endif
-        rts
-
-;TODO   jmp xt_block_boot
+        jmp xt_block_boot
 
 
 kernel_bye:
@@ -159,9 +155,9 @@ s_kernel_id:
 ; =====================================================================
 ; Simulator IO definitions
 
-.cwarn * >= $ffe0, "Magic IO conflict"
-
 .if TALI_ARCH == "c65"
+
+.cwarn *-1 >= $ffe0, "Magic IO conflict"
 
         * = $ffe0               ; use top memory to avoid stomping IO page
 

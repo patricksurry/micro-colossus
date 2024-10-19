@@ -206,6 +206,8 @@ _row:
         bra txt_blit
 
 
+xt_page:
+w_page:
 txt_cls:
         lda #>(TXT_BUF + TXT_WIDTH*(TXT_HEIGHT+1))
         sta txt_offset+1
@@ -264,6 +266,7 @@ txt_setxy:
         sta txt_offset+1        ; set high bits for txt_offset
 
         jmp lcd_setadp
+z_page:
 
 
 txt_show_cursor:
