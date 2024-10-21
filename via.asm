@@ -102,18 +102,18 @@ VIA_DVC_SPI = %11_0000  ; SPI input SR enabled
 ; hardware setup for PortB
 ; SD uses PB4 for chip detect (ipins on PB4 and 5
 
-; PB0..3 are unused
-SD_CD   = %0001_0000  ; in (card present)
-SD_CS   = %0010_0000  ; out, normally high (/CS)
-TTY_CS  = %0100_0000  ; out, normally high (/CS)
-SPK_OUT = %1000_0000  ; out, normally low  (no tone)
+DBG_OUT = %0000_1111            ; PB0..3 unused, but useful for debugging
+SD_CD   = %0001_0000            ; in (card present)
+SD_CS   = %0010_0000            ; out, normally high (/CS)
+TTY_CS  = %0100_0000            ; out, normally high (/CS)
+SPK_OUT = %1000_0000            ; out, normally low  (no tone)
 
 via_init:    ; () -> nil const X, Y
         ; The /CS pins should be initially high, others low
         lda # SD_CS | TTY_CS
         sta DVC_CTRL
-        ; designate three output pins in port B
-        lda # SD_CS | TTY_CS | SPK_OUT
+        ; designate output pins in port B
+        lda # SD_CS | TTY_CS | SPK_OUT | DBG_OUT
         sta DVC_CDR
 
         lda #%0111_1111

@@ -49,7 +49,7 @@ Qty | Description
 15  | 3.3-10KkΩ pull-up resistors
 12  | 100nF (0.1µF) bypass capacitors (near VCC for each IC)
 5   | 10µF bypass capacitors (one on each power rail)
-|    | (optional) |
+|   | (optional) |
 1   | MAX3100 UART (SPI mode 0 TTL-232 interface)
 1   | ECS-18-13-1X 1.8432MHz crystal oscillator
 2   | 20pF capacitors for oscillator
@@ -67,10 +67,9 @@ https://github.com/klemens-u/ic-label-creator (https://github.com/patricksurry/i
 TODO
 ---
 
-- [ ] sometimes there's a long wait on startup, some LCD reset/ready issue?
-- [ ] should use emit_a instead of kernel_putc in txt_* for better tty interaction
+- [ ] variable wait on startup, econoreset or max current draw issue?
+- [x] should use emit_a instead of kernel_putc in txt_* for better tty interaction
 - [x] add SREC> ( -- xt f ) word to parse 64tass `--s-record` output
-- [ ] add >SREC ( addr u -- ) to generate SRECORD output
-- [ ] merge DIGIT? with convert_hex_value and chr2nbl
+- [x] add >SREC ( addr u -- ) to generate SRECORD output
 - [x] fix CLEAVE using is_whitespace
-- [ ] drop -LEADING/-TRAILING as extras?
+- [ ] merge DIGIT? with convert_hex_value and chr2nbl

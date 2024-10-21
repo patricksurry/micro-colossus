@@ -78,21 +78,37 @@ sd_err_wstat    = $e3
 ; which we can then read by selecting that device and reading port A
 
 sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
-  ; Let the SD card boot up, by pumping the clock with SD CS disabled
 
-  ; We need to apply around 80 clock pulses with CS and MOSI high.
-  ; Normally MOSI doesn't matter when CS is high, but the card is
-  ; not yet is SPI mode, and in this non-SPI state it does care.
+        ; After power up, the host starts the clock and sends the initializing sequence on the CMD line.
+        ; This sequence is a contiguous stream of logical ‘1’s.
+        ; The sequence length is the maximum of 1msec, 74 clocks or the supply-ramp-uptime;
+        ; the additional 10 clocks (over the 64 clocks after what the card should be ready for communication)
+        ; is provided to eliminate power-up synchronization problems.
+
+        ; ACMD41 is a special synchronization command used to negotiate the operation voltage range
+        ; and to poll the cards until they are out of their power-up sequence.
+        ; Besides the operation voltage profile of the cards, the response to ACMD41 contains a busy flag,
+        ; indicating that the card is still working on its power-up procedure and is not ready for identification.
+        ;  This bit informs the host that the card is not ready. The host has to wait until this bit is cleared.
+        ; The maximum period of power up procedure of single card shall not exceed 1 second.
+
+        ; We need to send 74+ high bits with both CS and MOSI high.
+        ; Normally MOSI doesn't matter when CS is high, but the card is
+        ; not yet is SPI mode, and in this non-SPI state it does care.
 
         lda #SD_CS
         tsb DVC_CTRL
 
-        ; clock 20 x 8 high bits out without chip enable (CS hi)
-        ldy #20                 ; 20 * 8 = 160 clock transitions
+        ; clock 10 x 8 high bits out without chip enable (CS hi)
+        ldy #10                 ; 80 high bits
 -
-        jsr spi_readbyte        ; sends $ff
+        jsr spi_readbyte        ; sends $ff, i.e. 8 high bits
         dey                     ; 2 cycles
         bne -                   ; 2(+1) cycles
+
+        tya
+        ldy #100
+        jsr sleep               ; sleep for 1000xgrain cycles (1ms)
 
         ; now set CS low and send startup sequence
         lda #SD_CS
@@ -115,7 +131,7 @@ sd_init:    ; () -> A = 0 on success, err on failure, with X=cmd
         dex
         bne -
 
-        ldx #10
+        ldx #10                 ; try up to 10x with 100ms delay
 
 _cmd55:
         jsr sd_command
@@ -130,7 +146,7 @@ _cmd55:
         cmp #1
         bne _fail
 
-        lda #$10                ; wait a few millis and try again
+        lda #40                 ; sleep about 100 millis (40*256+y)*10*grain and try again
         jsr sleep
 
         dex

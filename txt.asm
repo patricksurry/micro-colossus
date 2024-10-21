@@ -11,7 +11,6 @@ txt_offset  .word ?
 txt_tmp     .byte ?
 txt_pager   .byte ?             ; counts number of scroll events between key press
 
-txt_str:
 txt_strz    .word ?             ; input zero-terminated string
 txt_outz    .word ?             ; output buffer for zero-terminated string
 txt_digrams .word ?             ; digram lookup table (128 2-byte pairs)
@@ -69,7 +68,13 @@ txt_init:
         rts
 
 
-txt_putc:   ; (A) -> nil const X
+txt_putc:   ; (A) -> nil const X,Y
+        phy
+        jsr _txt_putc
+        ply
+        rts
+
+_txt_putc:
     ; put printable chr A (stomped) at the current position, handle bksp, tab, CR, LF
 .if TALI_ARCH != "c65"
         cmp #AscBS
@@ -151,19 +156,6 @@ _fill:  lda #' '                ; fill until txt_x zeros all bits in mask
         bpl txt_scrollup
 
 _done:  rts
-
-
-txt_puts:
--
-        lda (txt_str)
-        beq +
-        jsr txt_putc
-        inc txt_str
-        bne -
-        inc txt_str+1
-        bra -
-+
-        rts
 
 
 txt_scrollup:
@@ -385,9 +377,7 @@ _putln: tay                     ; save number of characters for loop
 _out:   jsr cb0_get             ; consume wrp_col+1 chars
         dey
         bmi _last               ; last char gets special treatment
-        phy
-        jsr txt_putc
-        ply
+        jsr emit_a
         bra _out
 
 _last:
@@ -399,7 +389,7 @@ _last:
 
         lda #AscLF              ; otherwise add NL
 +
-        jsr txt_putc            ; non-ws character is at EOL so no NL needed
+        jsr emit_a             ; non-ws character is at EOL so no NL needed
         bra wrp_new_line        ; set state for new line and return
 
 

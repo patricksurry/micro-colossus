@@ -254,10 +254,10 @@ lcd_wait:   ; () -> nil const X, Y
     ; Read LCD control status until ready for command
 -
         lda LCD_CMD             ; read status
-
         and #LCD_ST_RDY         ; check both bits are set
         eor #LCD_ST_RDY         ; mask and then eor so 0 if set
 .if TALI_ARCH != "c65"
         bne -
 .endif
         rts
+

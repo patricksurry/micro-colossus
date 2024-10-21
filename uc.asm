@@ -78,23 +78,16 @@ IOBASE  = address($c000)
 
 kernel_init:
     ; Hardware initialization called as turnkey during forth startup
-        jsr util_init
+        sei                     ; no interrupts until we've set up I/O hardware
+
         jsr via_init
         jsr spi_init
         jsr tty_init
-        jsr kb_init
-        jsr lcd_init
-        jsr txt_init
 
-        ; ready to deal with interrupts
         cli
 
-        ; Setup complete, show kernel string and return to forth
-        lda #<s_kernel_id
-        sta txt_str
-        lda #>s_kernel_id
-        sta txt_str+1
-        jsr txt_puts
+        jsr kb_init
+        jsr util_init
 
 .if TALI_ARCH != "c65"
         lda #<spk_morse
@@ -107,7 +100,12 @@ kernel_init:
         lda #'S'
         jsr morse_send
 .endif
-        jmp xt_block_boot
+
+        jsr lcd_init
+        jsr txt_init
+
+        jmp forth               ; Setup complete, show kernel string and return to forth
+
 
 
 kernel_bye:
@@ -133,11 +131,7 @@ kernel_getc:
         rts
 
 
-kernel_putc:
-        phy
-        jsr txt_putc            ; only preserves X
-        ply
-        rts
+kernel_putc = txt_putc
 
 
 s_kernel_id:
@@ -150,7 +144,7 @@ s_kernel_id:
         .text "  | ._,_|\___(____/ \____)\___/|_____)", AscLF
         .text "  | |   `", AscLF
         .text "  |_|  TaliForth2 " .. IDENT, AscLF
-        .byte AscLF, 0
+        .shift AscLF
 
 ; =====================================================================
 ; Simulator IO definitions
@@ -188,13 +182,13 @@ io_blk_buffer:  .word ?         ; +$14     Little endian memory address
 
         * = $fff8
 
-        .word kernel_init       ; turnkey vector
-        .word forth             ; nmi
-        .word forth             ; reset
+        .word w_block_boot      ; turnkey vector
+        .word kernel_init       ; nmi
+        .word kernel_init       ; reset
 .if TALI_ARCH != "c65"
         .word via_isr           ; irq/brk
 .else
-        .word forth
+        .word kernel_init
 .endif
 
 
