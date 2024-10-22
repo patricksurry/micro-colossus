@@ -23,6 +23,11 @@ Useful links
   probably more than once.
 
 - My keyboard is the [nullbits nibble kit](https://nullbits.co/nibble/) - I love it!
+  It runs [KMK firmware](https://github.com/KMKfw/kmk_firmware) which is a
+  [CircuitPython](https://circuitpython.org/) alternative to QMK.
+  My [branch](https://github.com/patricksurry/kmk_firmware/tree/via-shift)
+  includes code to set up the nibble's keymap and bit-bang keypresses to the VIA.
+  See `boards/nullbitsco/nibble` and `kmk/extensions/via.py`.
 
 - I found these printable [IC labels](https://github.com/klemens-u/ic-label-creator)
   which are easy to cut out and attach with a glue stick.  I find them very helpful
@@ -112,3 +117,45 @@ Qty | Description
 Note: The HC logic family seems to work fine in practice but at least the '139 and '74 should be AHC to stay in spec for W65C02 timing.
 Using AHC throughout should be fine.
 
+Using the SD card
+---
+
+My host system is OS X, but a similar approach should work on Linux or Windows platforms.
+The key is to use the SD card in raw mode so we can read/write raw sectors.  To write
+a binary block image (e.g. `advent.blk`) to the card I use this recipe:
+
+```
+# before inserting the SD card on the host
+diskutil list   # see mounted drives
+
+# now insert SD card on the host
+diskutil list   # see which new drive appears, for example:
+
+  ...
+
+  /dev/disk4 (external, physical):
+    #:                       TYPE NAME                    SIZE       IDENTIFIER
+    0:     FDisk_partition_scheme                        *31.9 GB    disk4
+    1:             Windows_FAT_32 PRODOS1                 31.9 GB    disk4s1
+
+
+# unmount any numbered partition(s) from the new disk, e.g. disk4s1 above
+diskutil unmountDisk /dev/disk4s1
+
+# write to the *raw* disk using /dev/rdisk... instead of /dev/disk...
+# **BE CAREFUL** writing to the wrong disk can be catastrophic
+sudo dd if=data/advent.blk of=/dev/rdisk4
+```
+
+Use the reverse to copy data from the SD to the host, adding the `count` option
+to specify the number of 512 byte blocks.  (Note that Forth thinks of 1Kb blocks
+but SD cards and DD normally deal with 512 byte blocks.)
+
+```
+sudo dd if=/dev/rdisk4 of=data/advent.blk count=256
+```
+
+Using the TTY device
+---
+
+TODO
