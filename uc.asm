@@ -59,14 +59,17 @@ IOBASE  = address($c000)
 .include "../tali/taliforth.asm"
 
 .include "util.asm"
+
 .include "via.asm"
+.include "spi.asm"
+
 .include "speaker.asm"
 .include "lcd6963.asm"
 .include "kb.asm"
-
-.include "spi.asm"
+.include "joypad.asm"
 .include "sd.asm"
 .include "tty.asm"
+
 .include "morse.asm"
 .include "txt.asm"
 .if TESTS
@@ -80,14 +83,10 @@ kernel_init:
     ; Hardware initialization called as turnkey during forth startup
         sei                     ; no interrupts until we've set up I/O hardware
 
+        jsr util_init
         jsr via_init
         jsr spi_init
-        jsr tty_init
-
-        cli
-
         jsr kb_init
-        jsr util_init
 
 .if TALI_ARCH != "c65"
         lda #<spk_morse
@@ -103,6 +102,10 @@ kernel_init:
 
         jsr lcd_init
         jsr txt_init
+
+        jsr tty_init
+
+        cli
 
         jmp forth               ; Setup complete, show kernel string and return to forth
 

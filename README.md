@@ -22,6 +22,9 @@ Useful links
 - You should read Garth Wilson's [6502 primer](http://wilsonminesco.com/6502primer/),
   probably more than once.
 
+- The [6502 forum](http://forum.6502.org/) is a great source of ideas and advice
+    along with [`r/beneater`](https://www.reddit.com/r/beneater/).
+
 - My keyboard is the [nullbits nibble kit](https://nullbits.co/nibble/) - I love it!
   It runs [KMK firmware](https://github.com/KMKfw/kmk_firmware) which is a
   [CircuitPython](https://circuitpython.org/) alternative to QMK.
@@ -34,9 +37,13 @@ Useful links
   for "visual debugging".
   I've made some changes in [my fork](https://github.com/patricksurry/ic-label-creator).
 
-- The [6502 forum](http://forum.6502.org/) is a great source of ideas and advice
-    along with [`r/beneater`](https://www.reddit.com/r/beneater/).
+- I built Oddbloke's [EEPROM programmer kit](https://danceswithferrets.org/geekblog/?page_id=903)
+  to burn ROM images, and added gzip support and progresm monitoring for smoother uploading in
+  [my fork](https://github.com/patricksurry/eeprom-writer) of his
+  [eeprom-writer](https://github.com/oddblk/eeprom-writer).
 
+- I found Nectivio's [65C02-Tool](https://github.com/Nectivio/65C02-Tool) invaluable for
+  hardware debugging early on, and made some improvements in [my fork](https://github.com/patricksurry/65C02-tool).
 
 Physical Layout
 ---
