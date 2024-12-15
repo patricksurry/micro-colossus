@@ -15,7 +15,7 @@ TALI_OPTION_CR_EOL := [ "lf" ]
 TALI_OPTION_HISTORY := 0
 TALI_OPTION_TERSE := 1
 
-TALI_CONTRIB := ["adventure", "block", "byte", "core", "dasm", "dmp", "rand", "sd", "srecord", "string"]
+TALI_CONTRIB := ["adventure", "block", "byte", "core", "dmp", "dasm", "rand", "sd", "bind", "srecord", "tty"]
 TALI_ALT := ["dump", "page"]
 
 AscFF       = $0f               ; form feed
@@ -107,6 +107,10 @@ kernel_init:
 
         cli
 
+        ; if high byte of turnkey vector is in RAM, we're in a simulator and want warm start
+        lda #$c0
+        cmp $fff9               ; C=1 if turnkey is in RAM, C=0 normally
+
         jmp forth               ; Setup complete, show kernel string and return to forth
 
 
@@ -114,6 +118,8 @@ kernel_init:
 kernel_bye:
         brk
 
+
+kernel_putc = txt_putc
 
 kernel_getc:
         phy
@@ -133,8 +139,15 @@ kernel_getc:
         stz txt_pager           ; reset pager count
         rts
 
-
-kernel_putc = txt_putc
+.if TALI_ARCH != "c65"          ; c65 implements this already
+kernel_kbhit:
+        ; Return non-zero when a key is available and 0 otherwise.
+        lda kb_key7
+        bmi +                   ; key is ready (leave non-zero value)
+        lda #0                  ; no key available
++
+        rts
+.endif
 
 
 s_kernel_id:

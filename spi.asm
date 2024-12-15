@@ -3,7 +3,7 @@ SPI_SEND = VIA_SR
 
 
 spi_init:   ; () -> (); X,Y const
-    ; set up VIA for shift-out under PHI2 aka SPI_SEND
+    ; set up VIA for shift-out under PHI2 driving CB1 aka SPI_SEND
         lda VIA_ACR
         and #(255 - VIA_SR_MASK)
         ora #VIA_SR_OUT_PHI2

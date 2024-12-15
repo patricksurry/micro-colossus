@@ -13,8 +13,6 @@ tty_data:   .word ?             ; 16-bit word for r/w
 .endsection
 
 
-;TODO set RTS on init
-
 tty_init:
         stz tty_head
         stz tty_tail
@@ -23,8 +21,19 @@ tty_init:
         sta tty_data+1
         stz tty_data            ; default 8N1 @ 115.2K baud
 
+        jsr tty_rw
+        sec
         ; fall through
 
+tty_setrts: ; (C) -> nil; X,Y const
+    ; set RTS to carry
+        lda #%00100001
+        rol
+        asl ;%100001c0          ; write with Tx disabled to set RTS
+        sta tty_data+1
+        stz tty_data
+
+        ; fall through
 tty_rw:     ; () -> nil, X,Y const
         lda #TTY_CS             ; enable UART
         trb DVC_CTRL
@@ -57,16 +66,12 @@ tty_getrts: ; () -> A, C; X,Y const
         cmp #$10                ; leaves C=0 if nearly full, C=1 otherwise
         rts
 
-
-tty_setrts: ; (C) -> nil; X,Y const
-    ; set RTS to carry
-        lda #%00100001
-        rol
-        asl ;%100001c0          ; write with Tx disabled to set RTS
-        sta tty_data+1
-        stz tty_data
-        bra tty_rw
-
+tty_buflen:
+    ; return # of bytes ready to read (0 if none)
+        sec
+        lda tty_head
+        sbc tty_tail
+        rts
 
 tty_isr:    ; () -> nil const A, X, Y
     ; read available bytes to tty_buf and clear RTS if hit full threshold

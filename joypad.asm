@@ -1,19 +1,3 @@
-
-
-jpad_pushed:
-        ; return A = 0 if no buttons pressed on channe 0, $ff if any pressed
-        phx
-        phy
-        ldx #0
-        jsr jpad_buttons
-        tya
-        beq +
-        lda #$ff
-+
-        ply
-        plx
-        rts
-
 jpad_buttons:
         ; read button channel X=0 or 1, returning button flags in Y's four LSB (0000 = none pressed)
         jsr jpad_read

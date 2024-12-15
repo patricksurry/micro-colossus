@@ -110,6 +110,7 @@ SD_CS   = %0010_0000            ; out, normally high (/CS)
 TTY_CS  = %0100_0000            ; out, normally high (/CS)
 SPK_OUT = %1000_0000            ; out, normally low  (no tone)
 
+
 via_init:    ; () -> nil const X, Y
         ; The /CS pins should be initially high, others low
         lda # SD_CS | TTY_CS | JPAD_CS
