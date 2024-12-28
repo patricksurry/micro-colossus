@@ -1,16 +1,12 @@
-
-;TODO
-; hex e9 c082 c! 69 c080 c!
-;   : kbspi [ $1000 ] bind -a ;
-;   : ?k c080 c@ 3 and . ;
-
-kbspi_kbhit:
+kbspi_kbhit:    ; () -> A; X,Y const
     ; return A non-zero if a key is available
         lda #KBD_RDY
         and DVC_CTRL
         rts
 
-kbspi_getc:
+
+kbspi_getc:     ; () -> A; X,Y const
+    ; block until a character is ready, return in A
 -
         jsr kbspi_kbhit
         beq -           ; wait for key ready

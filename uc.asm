@@ -87,7 +87,6 @@ kernel_init:
         jsr util_init
         jsr via_init
         jsr spi_init
-;TODO no longer needed       jsr kb_init
 
 .if TALI_ARCH != "c65"
         lda #<spk_morse

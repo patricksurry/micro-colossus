@@ -43,7 +43,7 @@ Timing diagram (https://wavedrom.com/editor.html):
 .endcomment
 
 
-SPI_RECV = address(DVC_DATA | VIA_DVC_SPI)
+SPI_RECV = DVC_DATA
 SPI_SEND = VIA_SR
 
 
@@ -56,13 +56,15 @@ spi_host:
         sta VIA_ACR
         rts
 
-spi_peripheral:
+
+spi_peripheral: ; () -> A; X,Y const
     ; set up VIA as an SPI peripheral for slow external host to drive CB1 clock
         lda VIA_ACR
         and #(255 - VIA_SR_MASK)
         ora #VIA_SR_OUT_CB1
         sta VIA_ACR
         rts
+
 
 spi_readbyte:   ; () -> A; X,Y const
     ; trigger an SPI byte exchange and return the result

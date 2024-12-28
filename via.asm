@@ -18,7 +18,7 @@ VIA_IORA_   = address(VIA + $f)
 DVC_CTRL    = VIA_IORB
 DVC_CDR     = VIA_DDRB
 
-DVC_DATA    = VIA_IORA  ; read/write with VIA_DVC_xxx to enable device
+DVC_DATA    = VIA_IORA
 DVC_DDR     = VIA_DDRA
 
 ; VIA_ACR flag values
@@ -94,23 +94,16 @@ VIA_HS_CB2_HIGH  = %1110_0000
 ; device, and then do a read/write with a device-enabled address
 ; We read external VIA devices through port A.
 
-;TODO remove - unused
-VIA_DVC_NIL = %00_0000  ; no device enabled
-;             %01_0000  ; unused
-VIA_DVC_KBD = %10_0000  ; keyboard input SR enabled
-VIA_DVC_SPI = %11_0000  ; SPI input SR enabled
-
 ; hardware setup for PortB
 ; SD uses PB4 for chip detect (ipins on PB4 and 5
 
-
-KBD_RDY = %0000_0001            ; in (key ready)
-KBD_CS  = %0000_0010            ; out, normally high (/CS)
-; unused  %0000_0100            ; PB2 unused
-JPAD_CS = %0000_1000            ; out, normally high (/CS)
-SD_CD   = %0001_0000            ; in (card present)
-SD_CS   = %0010_0000            ; out, normally high (/CS)
-TTY_CS  = %0100_0000            ; out, normally high (/CS)
+JPAD_CS = %0000_0001            ; out, normally high (/CS)
+SD_CD   = %0000_0010            ; in (card present)
+SD_CS   = %0000_0100            ; out, normally high (/CS)
+TTY_CS  = %0000_1000            ; out, normally high (/CS)
+; unused  %0001_0000            ; PB4 unused
+KBD_RDY = %0010_0000            ; in (key ready)
+KBD_CS  = %0100_0000            ; out, normally high (/CS)
 SPK_OUT = %1000_0000            ; out, normally low  (no tone)
 
 
@@ -133,18 +126,3 @@ via_init:    ; () -> nil const X, Y
         sta VIA_PCR
 
         rts
-
-
-;TODO only TTY generates interrupts currently
-.comment
-via_isr:
-        pha                     ; save A register
-        lda VIA_IFR             ; IRQ | T1 | T2 | CB1 | CB2 | SR | CA1 | CA2
-        sta VIA_IFR             ; clear interrupt bit
-        lsr                     ; C=1 if CA2 caused interrupt (tty)
-        pla                     ; recover A register
-        bcs +
-        jmp kb_isr
-+
-        jmp tty_isr
-.endcomment
