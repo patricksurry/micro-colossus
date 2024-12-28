@@ -65,7 +65,8 @@ IOBASE  = address($c000)
 
 .include "speaker.asm"
 .include "lcd6963.asm"
-.include "kb.asm"
+; .include "kb.asm"
+.include "kbspi.asm"
 .include "joypad.asm"
 .include "sd.asm"
 .include "tty.asm"
@@ -86,7 +87,7 @@ kernel_init:
         jsr util_init
         jsr via_init
         jsr spi_init
-        jsr kb_init
+;TODO no longer needed       jsr kb_init
 
 .if TALI_ARCH != "c65"
         lda #<spk_morse
@@ -126,7 +127,7 @@ kernel_getc:
         jsr txt_show_cursor
 ;TODO in a non-blocking version we should inc rand16 l/h (skip 0)
 .if TALI_ARCH != "c65"
-        jsr kb_getc             ; preserves X and Y
+        jsr kbspi_getc             ; preserves X and Y
 .else
 -
         lda io_getc
@@ -140,13 +141,7 @@ kernel_getc:
         rts
 
 .if TALI_ARCH != "c65"          ; c65 implements this already
-kernel_kbhit:
-        ; Return non-zero when a key is available and 0 otherwise.
-        lda kb_key7
-        bmi +                   ; key is ready (leave non-zero value)
-        lda #0                  ; no key available
-+
-        rts
+kernel_kbhit = kbspi_kbhit
 .endif
 
 
@@ -202,7 +197,8 @@ io_blk_buffer:  .word ?         ; +$14     Little endian memory address
         .word kernel_init       ; nmi
         .word kernel_init       ; reset
 .if TALI_ARCH != "c65"
-        .word via_isr           ; irq/brk
+        ; TTY device is the only source of interrupts
+        .word tty_isr           ; irq/brk
 .else
         .word kernel_init
 .endif

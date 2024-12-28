@@ -62,7 +62,7 @@ VIA_HS_CA1_RISE  = %0000_0001
 
 VIA_HS_CA2_MASK  = %0000_1110
 VIA_HS_CA2_FALL  = %0000_0000
-VIA_HS_CA2_IFALL = %0000_0010
+VIA_HS_CA2_IFALL = %0000_0010   ; independent - must clear by writing IFR
 VIA_HS_CA2_RISE  = %0000_0100
 VIA_HS_CA2_IRISE = %0000_0110
 VIA_HS_CA2_HAND  = %0000_1000
@@ -94,6 +94,7 @@ VIA_HS_CB2_HIGH  = %1110_0000
 ; device, and then do a read/write with a device-enabled address
 ; We read external VIA devices through port A.
 
+;TODO remove - unused
 VIA_DVC_NIL = %00_0000  ; no device enabled
 ;             %01_0000  ; unused
 VIA_DVC_KBD = %10_0000  ; keyboard input SR enabled
@@ -102,8 +103,10 @@ VIA_DVC_SPI = %11_0000  ; SPI input SR enabled
 ; hardware setup for PortB
 ; SD uses PB4 for chip detect (ipins on PB4 and 5
 
-UNUSED  = %0000_0111            ; PB0..2 unused
 
+KBD_RDY = %0000_0001            ; in (key ready)
+KBD_CS  = %0000_0010            ; out, normally high (/CS)
+; unused  %0000_0100            ; PB2 unused
 JPAD_CS = %0000_1000            ; out, normally high (/CS)
 SD_CD   = %0001_0000            ; in (card present)
 SD_CS   = %0010_0000            ; out, normally high (/CS)
@@ -113,32 +116,35 @@ SPK_OUT = %1000_0000            ; out, normally low  (no tone)
 
 via_init:    ; () -> nil const X, Y
         ; The /CS pins should be initially high, others low
-        lda # SD_CS | TTY_CS | JPAD_CS
+        lda # KBD_CS | JPAD_CS | SD_CS | TTY_CS
         sta DVC_CTRL
         ; designate output pins in port B
-        lda # SD_CS | TTY_CS | SPK_OUT | JPAD_CS
+        lda # KBD_CS | JPAD_CS | SD_CS | TTY_CS | SPK_OUT
         sta DVC_CDR
 
         lda #%0111_1111
         sta VIA_IER             ; disable all interrupts
         sta VIA_IFR             ; clear interrupt flags
 
-        ; set up interrupts on CA1 and CA2 falling edge
-        lda #(VIA_IER_SET | VIA_INT_CA1 | VIA_INT_CA2)
+        ; set up interrupts on CA2 falling edge for TTY
+        lda #(VIA_IER_SET | VIA_INT_CA2)
         sta VIA_IER
-        lda #(VIA_HS_CA1_FALL | VIA_HS_CA2_IFALL)
+        lda #VIA_HS_CA2_IFALL
         sta VIA_PCR
 
         rts
 
 
+;TODO only TTY generates interrupts currently
+.comment
 via_isr:
-        pha
+        pha                     ; save A register
         lda VIA_IFR             ; IRQ | T1 | T2 | CB1 | CB2 | SR | CA1 | CA2
         sta VIA_IFR             ; clear interrupt bit
-        lsr
-        pla
+        lsr                     ; C=1 if CA2 caused interrupt (tty)
+        pla                     ; recover A register
         bcs +
         jmp kb_isr
 +
         jmp tty_isr
+.endcomment

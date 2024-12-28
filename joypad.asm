@@ -1,14 +1,18 @@
 jpad_buttons:
         ; read button channel X=0 or 1, returning button flags in Y's four LSB (0000 = none pressed)
+        ; channel 0 order is (msb) 0000_BAYX (lsb)
+        ; channel 1 order is (msb) 0000_21<select><start> (lsb)
+        ; measured values range from 16 (all)..251 (none)
+        ; best cutoff for no buttons is about 237 with steps of 15
         jsr jpad_read
         tya
         ldy #0
         clc
-        adc #48
+        adc #255-237        ; add initial step to test no buttons
         bcs +
 -
         iny
-        adc #13
+        adc #15             ; count how many 15s we can add before carry
         bcc -
 +
         rts

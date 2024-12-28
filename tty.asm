@@ -1,6 +1,19 @@
 .cwarn cold_user_table_end - cold_user_table > 127, "Expected user table < 128 bytes"
 .cwarn cp0 & $7f, "Expected cp0 on page boundary"
 
+
+.comment
+
+Run terminal on Mac side like this:
+
+        tio --flow hard --map INLCRNL /dev/tty.usbserial-ABSCE207
+
+Try ctrl-t ? for tio help, ctrl-t q to quit
+
+Use `tty` to switch to input/output over tty and `con` to switch back to local control
+
+.endcomment
+
 tty_buf = address(cp0 + $80)    ; Steal half a page above user variables
 
 

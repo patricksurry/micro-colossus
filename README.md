@@ -165,4 +165,6 @@ sudo dd if=/dev/rdisk4 of=data/advent.blk count=256
 Using the TTY device
 ---
 
-TODO
+I've added helpers words `tty` and `con` which swap the TaliForth input and output vectors
+from local to tty I/O and vice versa.  The startup mode is local screen and keyboard 
+(kernel_getc and kernel_putc), with `tty` switching to tty_getc / tty_putc
