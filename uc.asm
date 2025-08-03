@@ -114,7 +114,6 @@ kernel_init:
         jmp forth               ; Setup complete, show kernel string and return to forth
 
 
-
 kernel_bye:
         brk
 

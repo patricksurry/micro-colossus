@@ -1,6 +1,9 @@
 &micro;65c02
 ===
 
+> [!NOTE]
+> This repo is deprecated after migration to https://github.com/patricksurry/taliforth-uc
+
 This repo documents the hardware and software for my &micro;65c02, aka `micro-colossus`.
 This is a [Ben Eater](https://www.youtube.com/@BenEater)-inspired build
 that runs [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure).

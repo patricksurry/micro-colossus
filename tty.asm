@@ -91,6 +91,8 @@ tty_isr:    ; () -> nil const A, X, Y
         pha
         phy
 
+        lda VIA_IFR
+        sta VIA_IFR             ; clear the interrupt flag
 -
         stz tty_data+1          ; read
         stz tty_data
